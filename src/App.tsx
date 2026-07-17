@@ -276,6 +276,10 @@ function App() {
         return;
       }
       // Track actually finished naturally — advance the queue.
+      // Clear the (now-dead) source ref so the next track's stopCurrentSource()
+      // cleanup doesn't mistake this for something that needs a manual-stop flag,
+      // which would otherwise swallow the *following* track's natural end.
+      sourceNodeRef.current = null;
       playbackOffsetRef.current = 0;
       void advanceAfterTrackEnded(track);
     };
@@ -609,31 +613,42 @@ function App() {
       </div>
 
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button onClick={skipPrevious} disabled={!currentTrack}>
+        <div style={{ marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+          <button onClick={skipPrevious} disabled={!currentTrack} style={{ flexShrink: 0 }}>
             &laquo; Prev
           </button>
-          <button onClick={togglePlay} disabled={!currentTrack}>
+          <button onClick={togglePlay} disabled={!currentTrack} style={{ flexShrink: 0 }}>
             {isPlaying ? 'Pause' : 'Play'}
           </button>
-          <button onClick={skipNext} disabled={!currentTrack}>
+          <button onClick={skipNext} disabled={!currentTrack} style={{ flexShrink: 0 }}>
             Next &raquo;
           </button>
           <button
             onClick={toggleShuffle}
-            style={{ fontWeight: shuffleOn ? 'bold' : 'normal', backgroundColor: shuffleOn ? '#dde3ff' : undefined }}
+            style={{
+              flexShrink: 0,
+              fontWeight: shuffleOn ? 'bold' : 'normal',
+              backgroundColor: shuffleOn ? '#dde3ff' : undefined,
+            }}
           >
             Shuffle: {shuffleOn ? 'On' : 'Off'}
           </button>
-          <button onClick={cycleRepeat}>
+          <button onClick={cycleRepeat} style={{ flexShrink: 0 }}>
             Repeat: {repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}
           </button>
-          {currentTrack && (
-            <span style={{ marginLeft: '0.5rem' }}>
-              Now playing: {currentTrack.title} — {currentTrack.artist}
-            </span>
-          )}
         </div>
+        {currentTrack && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            Now playing: {currentTrack.title} — {currentTrack.artist}
+          </div>
+        )}
 
         <div style={{ marginBottom: '1rem' }}>
           <button onClick={pickFolder} disabled={isImporting}>
