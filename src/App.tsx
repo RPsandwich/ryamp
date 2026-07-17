@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import Database from '@tauri-apps/plugin-sql';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readDir, readFile } from '@tauri-apps/plugin-fs';
@@ -10,6 +10,7 @@ interface ParsedTrack {
   artist: string;
   album: string;
   duration: number;
+  trackNumber: number | null;
 }
 
 interface ParseResult {
@@ -24,6 +25,7 @@ interface DbTrack {
   artist: string;
   album: string;
   duration: number;
+  track_number: number | null;
 }
 
 interface DbPlaylist {
@@ -31,7 +33,19 @@ interface DbPlaylist {
   name: string;
 }
 
+interface AlbumSummary {
+  album: string;
+  artist: string;
+  trackCount: number;
+}
+
 type SortKey = 'title' | 'artist' | 'album' | 'duration';
+
+type View =
+  | { kind: 'library' }
+  | { kind: 'playlist'; id: number }
+  | { kind: 'albums' }
+  | { kind: 'album'; album: string; artist: string };
 
 function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -52,7 +66,7 @@ function App() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [playlists, setPlaylists] = useState<DbPlaylist[]>([]);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<number | null>(null);
+  const [view, setView] = useState<View>({ kind: 'library' });
   const [playlistTracks, setPlaylistTracks] = useState<DbTrack[]>([]);
   const [newPlaylistName, setNewPlaylistName] = useState('');
 
@@ -84,13 +98,17 @@ function App() {
   };
 
   const selectPlaylist = async (id: number | null) => {
-    setSelectedPlaylistId(id);
     if (id === null) {
+      setView({ kind: 'library' });
       await loadLibrary();
     } else {
+      setView({ kind: 'playlist', id });
       await loadPlaylistTracks(id);
     }
   };
+
+  const openAlbums = () => setView({ kind: 'albums' });
+  const openAlbum = (album: string, artist: string) => setView({ kind: 'album', album, artist });
 
   const createPlaylist = async () => {
     const name = newPlaylistName.trim();
@@ -105,8 +123,8 @@ function App() {
     const db = await Database.load('sqlite:ryamp.db');
     await db.execute('DELETE FROM playlist_tracks WHERE playlist_id = $1', [id]);
     await db.execute('DELETE FROM playlists WHERE id = $1', [id]);
-    if (selectedPlaylistId === id) {
-      setSelectedPlaylistId(null);
+    if (view.kind === 'playlist' && view.id === id) {
+      setView({ kind: 'library' });
       setPlaylistTracks([]);
     }
     await loadPlaylists();
@@ -123,7 +141,7 @@ function App() {
       'INSERT INTO playlist_tracks (playlist_id, track_id, position) VALUES ($1, $2, $3)',
       [playlistId, trackId, nextPos]
     );
-    if (selectedPlaylistId === playlistId) {
+    if (view.kind === 'playlist' && view.id === playlistId) {
       await loadPlaylistTracks(playlistId);
     }
   };
@@ -157,6 +175,32 @@ function App() {
       return 0;
     });
   };
+
+  const albums: AlbumSummary[] = useMemo(() => {
+    const map = new Map<string, AlbumSummary>();
+    for (const t of library) {
+      const key = `${t.artist}\u0000${t.album}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.trackCount++;
+      } else {
+        map.set(key, { album: t.album, artist: t.artist, trackCount: 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.album.localeCompare(b.album));
+  }, [library]);
+
+  const albumTracks: DbTrack[] = useMemo(() => {
+    if (view.kind !== 'album') return [];
+    return library
+      .filter((t) => t.album === view.album && t.artist === view.artist)
+      .sort((a, b) => {
+        const an = a.track_number ?? Number.MAX_SAFE_INTEGER;
+        const bn = b.track_number ?? Number.MAX_SAFE_INTEGER;
+        if (an !== bn) return an - bn;
+        return a.title.localeCompare(b.title);
+      });
+  }, [library, view]);
 
   // Load the library and playlists from the DB on startup
   useEffect(() => {
@@ -282,6 +326,7 @@ function App() {
           artist: metadata.common.artist || 'Unknown Artist',
           album: metadata.common.album || 'Unknown Album',
           duration: metadata.format.duration || 0,
+          trackNumber: metadata.common.track?.no ?? null,
         });
       } catch (err) {
         failed++;
@@ -293,25 +338,38 @@ function App() {
     return { tracks, failed };
   };
 
-  const saveTracksToDb = async (tracks: ParsedTrack[]): Promise<{ added: number; skipped: number }> => {
+  const saveTracksToDb = async (tracks: ParsedTrack[]): Promise<{ added: number; updated: number }> => {
     const db = await Database.load('sqlite:ryamp.db');
     let added = 0;
-    let skipped = 0;
+    let updated = 0;
 
     for (const track of tracks) {
-      const result = await db.execute(
-        `INSERT OR IGNORE INTO tracks (filepath, title, artist, album, duration)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [track.filepath, track.title, track.artist, track.album, track.duration]
+      const existing = await db.select<{ id: number }[]>(
+        'SELECT id FROM tracks WHERE filepath = $1',
+        [track.filepath]
       );
-      if (result.rowsAffected > 0) {
-        added++;
+      const existedBefore = existing.length > 0;
+
+      await db.execute(
+        `INSERT INTO tracks (filepath, title, artist, album, duration, track_number)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT(filepath) DO UPDATE SET
+           title = excluded.title,
+           artist = excluded.artist,
+           album = excluded.album,
+           duration = excluded.duration,
+           track_number = excluded.track_number`,
+        [track.filepath, track.title, track.artist, track.album, track.duration, track.trackNumber]
+      );
+
+      if (existedBefore) {
+        updated++;
       } else {
-        skipped++;
+        added++;
       }
     }
 
-    return { added, skipped };
+    return { added, updated };
   };
 
   const findMp3sRecursive = async (folderPath: string): Promise<string[]> => {
@@ -349,11 +407,11 @@ function App() {
       });
 
       setImportStatus('Saving to library...');
-      const { added, skipped } = await saveTracksToDb(tracks);
+      const { added, updated } = await saveTracksToDb(tracks);
       await loadLibrary();
 
       const parts = [`Added ${added} track${added === 1 ? '' : 's'}`];
-      if (skipped > 0) parts.push(`${skipped} already in library`);
+      if (updated > 0) parts.push(`${updated} refreshed`);
       if (failed > 0) parts.push(`${failed} failed to read`);
       setImportStatus(parts.join(' \u00b7 '));
     } finally {
@@ -367,8 +425,16 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const displayedTracks = sortTracks(selectedPlaylistId !== null ? playlistTracks : library);
-  const activePlaylist = playlists.find((p) => p.id === selectedPlaylistId);
+  const displayedTracks =
+    view.kind === 'playlist' ? sortTracks(playlistTracks) : view.kind === 'album' ? albumTracks : sortTracks(library);
+  const activePlaylist = view.kind === 'playlist' ? playlists.find((p) => p.id === view.id) : undefined;
+
+  const headerLabel =
+    view.kind === 'playlist'
+      ? `${activePlaylist?.name ?? 'Playlist'} (${playlistTracks.length} tracks)`
+      : view.kind === 'album'
+        ? `${view.album} — ${view.artist} (${albumTracks.length} tracks)`
+        : `Library (${library.length} tracks)`;
 
   return (
     <div style={{ padding: '2rem', fontFamily: 'monospace', display: 'flex', gap: '2rem' }}>
@@ -379,11 +445,22 @@ function App() {
           onClick={() => selectPlaylist(null)}
           style={{
             cursor: 'pointer',
-            fontWeight: selectedPlaylistId === null ? 'bold' : 'normal',
+            fontWeight: view.kind === 'library' ? 'bold' : 'normal',
             padding: '0.25rem 0',
           }}
         >
           All Tracks ({library.length})
+        </div>
+
+        <div
+          onClick={openAlbums}
+          style={{
+            cursor: 'pointer',
+            fontWeight: view.kind === 'albums' || view.kind === 'album' ? 'bold' : 'normal',
+            padding: '0.25rem 0',
+          }}
+        >
+          Albums ({albums.length})
         </div>
 
         <div style={{ marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Playlists</div>
@@ -402,7 +479,7 @@ function App() {
               style={{
                 cursor: 'pointer',
                 flex: 1,
-                fontWeight: selectedPlaylistId === pl.id ? 'bold' : 'normal',
+                fontWeight: view.kind === 'playlist' && view.id === pl.id ? 'bold' : 'normal',
               }}
             >
               {pl.name}
@@ -451,66 +528,104 @@ function App() {
           {importStatus && <span style={{ marginLeft: '1rem' }}>{importStatus}</span>}
         </div>
 
-        <div>
-          <strong>
-            {selectedPlaylistId === null
-              ? `Library (${library.length} tracks)`
-              : `${activePlaylist?.name ?? 'Playlist'} (${playlistTracks.length} tracks)`}
-          </strong>
-          <table style={{ width: '100%', marginTop: '0.5rem', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>
-                {(['title', 'artist', 'album', 'duration'] as const).map((key) => (
-                  <th
-                    key={key}
-                    onClick={() => handleSort(key)}
-                    style={{ cursor: 'pointer', userSelect: 'none' }}
-                  >
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                    {sortKey === key && (sortDir === 'asc' ? ' \u25b2' : ' \u25bc')}
-                  </th>
-                ))}
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedTracks.map((track) => (
-                <tr
-                  key={track.id}
+        {view.kind === 'albums' ? (
+          <div>
+            <strong>Albums ({albums.length})</strong>
+            <div style={{ marginTop: '0.5rem' }}>
+              {albums.map((a) => (
+                <div
+                  key={`${a.artist}\u0000${a.album}`}
+                  onClick={() => openAlbum(a.album, a.artist)}
                   style={{
-                    backgroundColor: currentTrack?.id === track.id ? '#eee' : 'transparent',
+                    padding: '0.5rem 0',
+                    borderBottom: '1px solid #eee',
+                    cursor: 'pointer',
                   }}
                 >
-                  <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.title}</td>
-                  <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.artist}</td>
-                  <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.album}</td>
-                  <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{formatDuration(track.duration)}</td>
-                  <td>
-                    {selectedPlaylistId === null ? (
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const plId = Number(e.target.value);
-                          if (plId) addTrackToPlaylist(track.id, plId);
-                          e.target.value = '';
-                        }}
-                      >
-                        <option value="">+ Add to...</option>
-                        {playlists.map((pl) => (
-                          <option key={pl.id} value={pl.id}>{pl.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <button onClick={() => removeTrackFromPlaylist(track.id, selectedPlaylistId!)}>
-                        Remove
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                  <div style={{ fontWeight: 'bold' }}>{a.album}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                    {a.artist} · {a.trackCount} track{a.trackCount === 1 ? '' : 's'}
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+              {albums.length === 0 && <div style={{ color: '#666' }}>No albums yet — import some music.</div>}
+            </div>
+          </div>
+        ) : (
+          <div>
+            {view.kind === 'album' && (
+              <button onClick={openAlbums} style={{ marginBottom: '0.5rem' }}>
+                &larr; Back to Albums
+              </button>
+            )}
+            <strong>{headerLabel}</strong>
+            <table style={{ width: '100%', marginTop: '0.5rem', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>
+                  {view.kind === 'album' && <th style={{ width: '2.5rem' }}>#</th>}
+                  {(['title', 'artist', 'album', 'duration'] as const)
+                    .filter((key) => view.kind !== 'album' || (key !== 'artist' && key !== 'album'))
+                    .map((key) => (
+                      <th
+                        key={key}
+                        onClick={view.kind === 'album' ? undefined : () => handleSort(key)}
+                        style={{ cursor: view.kind === 'album' ? 'default' : 'pointer', userSelect: 'none' }}
+                      >
+                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                        {view.kind !== 'album' && sortKey === key && (sortDir === 'asc' ? ' \u25b2' : ' \u25bc')}
+                      </th>
+                    ))}
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedTracks.map((track) => (
+                  <tr
+                    key={track.id}
+                    style={{
+                      backgroundColor: currentTrack?.id === track.id ? '#eee' : 'transparent',
+                    }}
+                  >
+                    {view.kind === 'album' && (
+                      <td onClick={() => playTrack(track)} style={{ cursor: 'pointer', color: '#666' }}>
+                        {track.track_number ?? '—'}
+                      </td>
+                    )}
+                    <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.title}</td>
+                    {view.kind !== 'album' && (
+                      <>
+                        <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.artist}</td>
+                        <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.album}</td>
+                      </>
+                    )}
+                    <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{formatDuration(track.duration)}</td>
+                    <td>
+                      {view.kind === 'playlist' ? (
+                        <button onClick={() => removeTrackFromPlaylist(track.id, view.id)}>
+                          Remove
+                        </button>
+                      ) : (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const plId = Number(e.target.value);
+                            if (plId) addTrackToPlaylist(track.id, plId);
+                            e.target.value = '';
+                          }}
+                        >
+                          <option value="">+ Add to...</option>
+                          {playlists.map((pl) => (
+                            <option key={pl.id} value={pl.id}>{pl.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
