@@ -40,12 +40,22 @@ interface AlbumSummary {
 }
 
 type SortKey = 'title' | 'artist' | 'album' | 'duration';
+type RepeatMode = 'off' | 'all' | 'one';
 
 type View =
   | { kind: 'library' }
   | { kind: 'playlist'; id: number }
   | { kind: 'albums' }
   | { kind: 'album'; album: string; artist: string };
+
+const pickRandomIndex = (queueLength: number, excludeIndex: number): number => {
+  if (queueLength <= 1) return excludeIndex;
+  let idx = Math.floor(Math.random() * queueLength);
+  while (idx === excludeIndex) {
+    idx = Math.floor(Math.random() * queueLength);
+  }
+  return idx;
+};
 
 function App() {
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -56,6 +66,10 @@ function App() {
   const playbackOffsetRef = useRef(0);
   const contextStartTimeRef = useRef(0);
   const manualStopRef = useRef(false);
+  const currentQueueRef = useRef<DbTrack[]>([]);
+  const shuffleHistoryRef = useRef<DbTrack[]>([]);
+  const repeatModeRef = useRef<RepeatMode>('off');
+  const shuffleOnRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
@@ -72,6 +86,20 @@ function App() {
 
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
+  const [shuffleOn, setShuffleOn] = useState(false);
+
+  // Keep refs in sync so the long-lived `onended` callback (created when a track
+  // starts, but firing whenever it finishes) always reads the latest mode rather
+  // than whatever was current when that particular track started playing.
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
+
+  useEffect(() => {
+    shuffleOnRef.current = shuffleOn;
+  }, [shuffleOn]);
 
   const loadLibrary = async () => {
     const db = await Database.load('sqlite:ryamp.db');
@@ -236,7 +264,7 @@ function App() {
     }
   };
 
-  const playFromOffset = (buffer: AudioBuffer, offsetSeconds: number) => {
+  const playFromOffset = (track: DbTrack, buffer: AudioBuffer, offsetSeconds: number) => {
     const ctx = audioContextRef.current!;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -247,9 +275,9 @@ function App() {
         manualStopRef.current = false;
         return;
       }
-      // Track actually finished naturally
-      setIsPlaying(false);
+      // Track actually finished naturally — advance the queue.
       playbackOffsetRef.current = 0;
+      void advanceAfterTrackEnded(track);
     };
 
     source.start(0, offsetSeconds);
@@ -274,7 +302,81 @@ function App() {
       await audioContextRef.current!.resume();
     }
 
-    playFromOffset(audioBuffer, 0);
+    playFromOffset(track, audioBuffer, 0);
+  };
+
+  // Sets the active playback queue (the list a track was chosen from) and plays a track from it.
+  const playTrackFromQueue = async (track: DbTrack, queue: DbTrack[]) => {
+    currentQueueRef.current = queue;
+    await playTrack(track);
+  };
+
+  // Used when the person actively picks a track from a list — starts a fresh
+  // shuffle-history context, since we're now navigating a (possibly new) queue.
+  const selectAndPlay = async (track: DbTrack, queue: DbTrack[]) => {
+    shuffleHistoryRef.current = [];
+    await playTrackFromQueue(track, queue);
+  };
+
+  // Moves forward/back one track relative to `fromTrack` within the current queue,
+  // respecting shuffle and repeat modes. `auto` distinguishes "track just ended
+  // naturally" from a manual Next/Previous button press (repeat-one only replays
+  // on natural end, not on a manual skip).
+  const playRelative = async (fromTrack: DbTrack, direction: 1 | -1, opts?: { auto?: boolean }) => {
+    const queue = currentQueueRef.current;
+    if (queue.length === 0) return;
+
+    const currentIndex = queue.findIndex((t) => t.id === fromTrack.id);
+    const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+
+    if (shuffleOnRef.current) {
+      if (direction === 1) {
+        shuffleHistoryRef.current.push(fromTrack);
+        const nextIndex = pickRandomIndex(queue.length, safeIndex);
+        await playTrackFromQueue(queue[nextIndex], queue);
+      } else {
+        const prevTrack = shuffleHistoryRef.current.pop();
+        await playTrackFromQueue(prevTrack ?? fromTrack, queue);
+      }
+      return;
+    }
+
+    let targetIndex = safeIndex + direction;
+
+    if (targetIndex < 0) {
+      targetIndex = repeatModeRef.current === 'all' ? queue.length - 1 : 0;
+    } else if (targetIndex >= queue.length) {
+      if (repeatModeRef.current === 'all') {
+        targetIndex = 0;
+      } else {
+        if (opts?.auto) setIsPlaying(false); // reached the end of the queue naturally
+        return;
+      }
+    }
+
+    await playTrackFromQueue(queue[targetIndex], queue);
+  };
+
+  const advanceAfterTrackEnded = async (finishedTrack: DbTrack) => {
+    if (repeatModeRef.current === 'one') {
+      await playTrackFromQueue(finishedTrack, currentQueueRef.current);
+      return;
+    }
+    await playRelative(finishedTrack, 1, { auto: true });
+  };
+
+  const skipNext = () => {
+    if (currentTrack) void playRelative(currentTrack, 1);
+  };
+
+  const skipPrevious = () => {
+    if (currentTrack) void playRelative(currentTrack, -1);
+  };
+
+  const toggleShuffle = () => setShuffleOn((s) => !s);
+
+  const cycleRepeat = () => {
+    setRepeatMode((mode) => (mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off'));
   };
 
   const togglePlay = async () => {
@@ -290,7 +392,7 @@ function App() {
       stopCurrentSource();
       setIsPlaying(false);
     } else {
-      playFromOffset(currentBufferRef.current, playbackOffsetRef.current);
+      playFromOffset(currentTrack, currentBufferRef.current, playbackOffsetRef.current);
     }
   };
 
@@ -507,12 +609,27 @@ function App() {
       </div>
 
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <button onClick={skipPrevious} disabled={!currentTrack}>
+            &laquo; Prev
+          </button>
           <button onClick={togglePlay} disabled={!currentTrack}>
             {isPlaying ? 'Pause' : 'Play'}
           </button>
+          <button onClick={skipNext} disabled={!currentTrack}>
+            Next &raquo;
+          </button>
+          <button
+            onClick={toggleShuffle}
+            style={{ fontWeight: shuffleOn ? 'bold' : 'normal', backgroundColor: shuffleOn ? '#dde3ff' : undefined }}
+          >
+            Shuffle: {shuffleOn ? 'On' : 'Off'}
+          </button>
+          <button onClick={cycleRepeat}>
+            Repeat: {repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}
+          </button>
           {currentTrack && (
-            <span style={{ marginLeft: '1rem' }}>
+            <span style={{ marginLeft: '0.5rem' }}>
               Now playing: {currentTrack.title} — {currentTrack.artist}
             </span>
           )}
@@ -587,18 +704,18 @@ function App() {
                     }}
                   >
                     {view.kind === 'album' && (
-                      <td onClick={() => playTrack(track)} style={{ cursor: 'pointer', color: '#666' }}>
+                      <td onClick={() => { void selectAndPlay(track, displayedTracks); }} style={{ cursor: 'pointer', color: '#666' }}>
                         {track.track_number ?? '—'}
                       </td>
                     )}
-                    <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.title}</td>
+                    <td onClick={() => { void selectAndPlay(track, displayedTracks); }} style={{ cursor: 'pointer' }}>{track.title}</td>
                     {view.kind !== 'album' && (
                       <>
-                        <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.artist}</td>
-                        <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{track.album}</td>
+                        <td onClick={() => { void selectAndPlay(track, displayedTracks); }} style={{ cursor: 'pointer' }}>{track.artist}</td>
+                        <td onClick={() => { void selectAndPlay(track, displayedTracks); }} style={{ cursor: 'pointer' }}>{track.album}</td>
                       </>
                     )}
-                    <td onClick={() => playTrack(track)} style={{ cursor: 'pointer' }}>{formatDuration(track.duration)}</td>
+                    <td onClick={() => { void selectAndPlay(track, displayedTracks); }} style={{ cursor: 'pointer' }}>{formatDuration(track.duration)}</td>
                     <td>
                       {view.kind === 'playlist' ? (
                         <button onClick={() => removeTrackFromPlaylist(track.id, view.id)}>
