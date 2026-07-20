@@ -3,6 +3,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { THEMES, type ThemeColors, type ThemePreset } from '../skins/themes';
 
+const THEME_STORAGE_KEY = 'ryamp.themeId';
+const AVATAR_STORAGE_KEY = 'ryamp.avatarPath';
+
 // Maps each ThemeColors key to the actual CSS custom property it drives.
 // Every component already reads these variables (see index.css), so
 // applying a theme is just re-setting them on the root element.
@@ -40,17 +43,59 @@ function applyTheme(theme: ThemePreset) {
   root.setProperty('--accent-violet-rgb', hexToRgbTriplet(theme.colors.accentViolet));
 }
 
-export function useSkin() {
-  const [themeId, setThemeId] = useState<string>(THEMES[0].id);
-  const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
+// localStorage can throw in some restricted embedding contexts (rare for a
+// real desktop webview, but cheap to guard) -- these wrappers just make
+// persistence best-effort rather than something that can crash the app.
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
 
-  // Re-applies whenever the selected theme changes. Not persisted yet --
-  // resets to the default (cyberpunk) on every app launch. Worth adding
-  // localStorage or a small settings file in a follow-up if that's annoying.
+function writeStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Persistence failed silently -- the choice still applies for this
+    // session, it just won't survive a restart.
+  }
+}
+
+function clearStorage(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+function loadStoredThemeId(): string {
+  const stored = readStorage(THEME_STORAGE_KEY);
+  return stored && THEMES.some((t) => t.id === stored) ? stored : THEMES[0].id;
+}
+
+export function useSkin() {
+  const [themeId, setThemeIdState] = useState<string>(loadStoredThemeId);
+  const [avatarPath, setAvatarPath] = useState<string | null>(() => readStorage(AVATAR_STORAGE_KEY));
+
+  // Re-applies whenever the selected theme changes (including on first
+  // mount, restoring whatever was saved from last time).
   useEffect(() => {
     const theme = THEMES.find((t) => t.id === themeId) ?? THEMES[0];
     applyTheme(theme);
   }, [themeId]);
+
+  const setThemeId = useCallback((id: string) => {
+    setThemeIdState(id);
+    writeStorage(THEME_STORAGE_KEY, id);
+  }, []);
+
+  // Re-derives the displayable src from the persisted absolute path on every
+  // render (cheap string transform) rather than storing the converted URL
+  // itself, so a restart just needs the original filesystem path back.
+  const avatarSrc = avatarPath ? convertFileSrc(avatarPath) : null;
 
   const pickAvatarImage = useCallback(async () => {
     const filePath = await open({
@@ -60,14 +105,15 @@ export function useSkin() {
     });
 
     if (typeof filePath === 'string') {
-      // convertFileSrc turns an absolute filesystem path into a URL the
-      // webview is actually allowed to load as an <img src>, same asset
-      // protocol used elsewhere in the app.
-      setAvatarSrc(convertFileSrc(filePath));
+      setAvatarPath(filePath);
+      writeStorage(AVATAR_STORAGE_KEY, filePath);
     }
   }, []);
 
-  const clearAvatar = useCallback(() => setAvatarSrc(null), []);
+  const clearAvatar = useCallback(() => {
+    setAvatarPath(null);
+    clearStorage(AVATAR_STORAGE_KEY);
+  }, []);
 
   return {
     themes: THEMES,
