@@ -89,6 +89,10 @@ function App() {
 
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [shuffleOn, setShuffleOn] = useState(false);
+  const [visualizerMode, setVisualizerMode] = useState<'bars' | 'wave'>('bars');
+  const visualizerCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const visualizerRafRef = useRef<number | null>(null);
+  const visualizerModeRef = useRef(visualizerMode);
 
   // Keep refs in sync so the long-lived `onended` callback (created when a track
   // starts, but firing whenever it finishes) always reads the latest mode rather
@@ -100,6 +104,81 @@ function App() {
   useEffect(() => {
     shuffleOnRef.current = shuffleOn;
   }, [shuffleOn]);
+
+  useEffect(() => {
+    visualizerModeRef.current = visualizerMode;
+  }, [visualizerMode]);
+
+  // Basic MVP visualizer loop — reads directly from the AnalyserNode already
+  // wired into the audio graph. Runs only while a track is actually playing.
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const canvas = visualizerCanvasRef.current;
+    const analyser = analyserRef.current;
+    if (!canvas || !analyser) return;
+
+    const ctx2d = canvas.getContext('2d');
+    if (!ctx2d) return;
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      visualizerRafRef.current = requestAnimationFrame(draw);
+
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx2d.clearRect(0, 0, width, height);
+
+      if (visualizerModeRef.current === 'bars') {
+        analyser.getByteFrequencyData(dataArray);
+        const barCount = 64;
+        const step = Math.floor(bufferLength / barCount);
+        const barWidth = width / barCount;
+        for (let i = 0; i < barCount; i++) {
+          const value = dataArray[i * step] ?? 0;
+          const barHeight = (value / 255) * height;
+          const hue = (i / barCount) * 300; // 0 (red) through ~300 (magenta), skips wrapping back to red
+          ctx2d.fillStyle = `hsl(${hue}, 90%, 55%)`;
+          ctx2d.fillRect(i * barWidth, height - barHeight, barWidth - 1, barHeight);
+        }
+      } else {
+        analyser.getByteTimeDomainData(dataArray);
+        const gradient = ctx2d.createLinearGradient(0, 0, width, 0);
+        gradient.addColorStop(0, 'hsl(0, 90%, 55%)');
+        gradient.addColorStop(0.17, 'hsl(50, 90%, 55%)');
+        gradient.addColorStop(0.34, 'hsl(100, 90%, 55%)');
+        gradient.addColorStop(0.5, 'hsl(180, 90%, 55%)');
+        gradient.addColorStop(0.67, 'hsl(220, 90%, 55%)');
+        gradient.addColorStop(0.84, 'hsl(280, 90%, 55%)');
+        gradient.addColorStop(1, 'hsl(320, 90%, 55%)');
+        ctx2d.lineWidth = 2;
+        ctx2d.strokeStyle = gradient;
+        ctx2d.beginPath();
+        const sliceWidth = width / bufferLength;
+        let x = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = (v * height) / 2;
+          if (i === 0) ctx2d.moveTo(x, y);
+          else ctx2d.lineTo(x, y);
+          x += sliceWidth;
+        }
+        ctx2d.lineTo(width, height / 2);
+        ctx2d.stroke();
+      }
+    };
+
+    draw();
+
+    return () => {
+      if (visualizerRafRef.current !== null) {
+        cancelAnimationFrame(visualizerRafRef.current);
+        visualizerRafRef.current = null;
+      }
+    };
+  }, [isPlaying]);
 
   const loadLibrary = async () => {
     const db = await Database.load('sqlite:ryamp.db');
@@ -614,10 +693,53 @@ function App() {
           />
           <button onClick={createPlaylist}>+</button>
         </div>
+
+        <div style={{ marginTop: '0.75rem' }}>
+          <button onClick={pickFolder} disabled={isImporting} style={{ width: '100%' }}>
+            {isImporting ? 'Importing...' : 'Import Music Folder'}
+          </button>
+          {selectedFolder && !importStatus && (
+            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+              Last imported: {selectedFolder}
+            </div>
+          )}
+          {importStatus && (
+            <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>{importStatus}</div>
+          )}
+        </div>
       </div>
 
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'nowrap' }}>
+        <canvas
+          ref={visualizerCanvasRef}
+          width={800}
+          height={80}
+          style={{ width: '100%', height: '80px', display: 'block', background: '#111', borderRadius: '4px' }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '0.4rem 0 1rem' }}>
+          <button
+            onClick={() => setVisualizerMode((m) => (m === 'bars' ? 'wave' : 'bars'))}
+            style={{ fontSize: '0.75rem' }}
+          >
+            Visualizer: {visualizerMode === 'bars' ? 'Bars' : 'Wave'}
+          </button>
+        </div>
+
+        {currentTrack && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            Now playing: {currentTrack.title} — {currentTrack.artist}
+          </div>
+        )}
+
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button onClick={skipPrevious} disabled={!currentTrack} style={{ flexShrink: 0 }}>
             &laquo; Prev
           </button>
@@ -641,28 +763,12 @@ function App() {
             Repeat: {repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}
           </button>
         </div>
-        {currentTrack && (
-          <div
-            style={{
-              marginBottom: '1rem',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            Now playing: {currentTrack.title} — {currentTrack.artist}
+
+        {view.kind === 'album' && (
+          <div style={{ marginBottom: '1rem' }}>
+            <button onClick={openAlbums}>&larr; Back to Albums</button>
           </div>
         )}
-
-        <div style={{ marginBottom: '1rem' }}>
-          <button onClick={pickFolder} disabled={isImporting}>
-            {isImporting ? 'Importing...' : 'Import Music Folder'}
-          </button>
-          {selectedFolder && !importStatus && (
-            <span style={{ marginLeft: '1rem' }}>Last imported: {selectedFolder}</span>
-          )}
-          {importStatus && <span style={{ marginLeft: '1rem' }}>{importStatus}</span>}
-        </div>
 
         {view.kind === 'albums' ? (
           <div>
@@ -689,11 +795,6 @@ function App() {
           </div>
         ) : (
           <div>
-            {view.kind === 'album' && (
-              <button onClick={openAlbums} style={{ marginBottom: '0.5rem' }}>
-                &larr; Back to Albums
-              </button>
-            )}
             <strong>{headerLabel}</strong>
             <table style={{ width: '100%', marginTop: '0.5rem', borderCollapse: 'collapse' }}>
               <thead>
