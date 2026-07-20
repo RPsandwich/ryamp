@@ -12,7 +12,7 @@ function App() {
   const lib = useLibrary();
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'monospace', display: 'flex', gap: '2rem' }}>
+    <div style={{ padding: '2rem', display: 'flex', gap: '1.5rem', minHeight: '100vh', alignItems: 'flex-start' }}>
       <Sidebar
         libraryCount={lib.library.length}
         albumsCount={lib.albums.length}
@@ -30,7 +30,7 @@ function App() {
         importStatus={lib.importStatus}
       />
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <Visualizer
           canvasRef={visualizer.visualizerCanvasRef}
           mode={visualizer.visualizerMode}

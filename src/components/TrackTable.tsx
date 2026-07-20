@@ -36,26 +36,18 @@ export function TrackTable({
 }: TrackTableProps) {
   if (view.kind === 'albums') {
     return (
-      <div>
-        <strong>Albums ({albums.length})</strong>
-        <div style={{ marginTop: '0.5rem' }}>
+      <div className="panel">
+        <span className="section-label">Albums ({albums.length})</span>
+        <div>
           {albums.map((a) => (
-            <div
-              key={`${a.artist}\u0000${a.album}`}
-              onClick={() => openAlbum(a.album, a.artist)}
-              style={{
-                padding: '0.5rem 0',
-                borderBottom: '1px solid #eee',
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontWeight: 'bold' }}>{a.album}</div>
-              <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                {a.artist} · {a.trackCount} track{a.trackCount === 1 ? '' : 's'}
+            <div key={`${a.artist}\u0000${a.album}`} onClick={() => openAlbum(a.album, a.artist)} className="album-card">
+              <div className="album-title">{a.album}</div>
+              <div className="album-meta">
+                {a.artist} &middot; {a.trackCount} track{a.trackCount === 1 ? '' : 's'}
               </div>
             </div>
           ))}
-          {albums.length === 0 && <div style={{ color: '#666' }}>No albums yet — import some music.</div>}
+          {albums.length === 0 && <div style={{ color: 'var(--text-dim)' }}>No albums yet — import some music.</div>}
         </div>
       </div>
     );
@@ -65,15 +57,17 @@ export function TrackTable({
     <>
       {view.kind === 'album' && (
         <div style={{ marginBottom: '1rem' }}>
-          <button onClick={openAlbums}>&larr; Back to Albums</button>
+          <button className="btn-retro" onClick={openAlbums}>
+            &larr; Back to Albums
+          </button>
         </div>
       )}
 
-      <div>
-        <strong>{headerLabel}</strong>
-        <table style={{ width: '100%', marginTop: '0.5rem', borderCollapse: 'collapse' }}>
+      <div className="panel">
+        <span className="section-label">{headerLabel}</span>
+        <table className="track-table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>
+            <tr>
               {view.kind === 'album' && <th style={{ width: '2.5rem' }}>#</th>}
               {(['title', 'artist', 'album', 'duration'] as const)
                 .filter((key) => view.kind !== 'album' || (key !== 'artist' && key !== 'album'))
@@ -81,7 +75,7 @@ export function TrackTable({
                   <th
                     key={key}
                     onClick={view.kind === 'album' ? undefined : () => handleSort(key)}
-                    style={{ cursor: view.kind === 'album' ? 'default' : 'pointer', userSelect: 'none' }}
+                    style={{ cursor: view.kind === 'album' ? 'default' : 'pointer' }}
                   >
                     {key.charAt(0).toUpperCase() + key.slice(1)}
                     {view.kind !== 'album' && sortKey === key && (sortDir === 'asc' ? ' \u25b2' : ' \u25bc')}
@@ -92,30 +86,25 @@ export function TrackTable({
           </thead>
           <tbody>
             {displayedTracks.map((track) => (
-              <tr
-                key={track.id}
-                style={{
-                  backgroundColor: currentTrack?.id === track.id ? '#eee' : 'transparent',
-                }}
-              >
+              <tr key={track.id} className={currentTrack?.id === track.id ? 'is-current' : undefined}>
                 {view.kind === 'album' && (
-                  <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ cursor: 'pointer', color: '#666' }}>
+                  <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ color: 'var(--text-dim)' }}>
                     {track.track_number ?? '—'}
                   </td>
                 )}
-                <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ cursor: 'pointer' }}>{track.title}</td>
+                <td onClick={() => selectAndPlay(track, displayedTracks)}>{track.title}</td>
                 {view.kind !== 'album' && (
                   <>
-                    <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ cursor: 'pointer' }}>{track.artist}</td>
-                    <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ cursor: 'pointer' }}>{track.album}</td>
+                    <td onClick={() => selectAndPlay(track, displayedTracks)}>{track.artist}</td>
+                    <td onClick={() => selectAndPlay(track, displayedTracks)}>{track.album}</td>
                   </>
                 )}
-                <td onClick={() => selectAndPlay(track, displayedTracks)} style={{ cursor: 'pointer' }}>
-                  {formatDuration(track.duration)}
-                </td>
-                <td>
+                <td onClick={() => selectAndPlay(track, displayedTracks)}>{formatDuration(track.duration)}</td>
+                <td onClick={(e) => e.stopPropagation()} style={{ cursor: 'default' }}>
                   {view.kind === 'playlist' ? (
-                    <button onClick={() => removeTrackFromPlaylist(track.id, view.id)}>Remove</button>
+                    <button className="btn-retro" onClick={() => removeTrackFromPlaylist(track.id, view.id)}>
+                      Remove
+                    </button>
                   ) : (
                     <select
                       value=""

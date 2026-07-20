@@ -22,12 +22,11 @@ export function Visualizer({ canvasRef, mode, setMode }: VisualizerProps) {
         devicePixelRatio) to match whatever this renders at on screen, so it
         stays crisp instead of being CSS-stretched from a fixed 800x80 buffer.
       */}
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: '80px', display: 'block', background: '#111', borderRadius: '4px' }}
-      />
+      <div className="led-screen">
+        <canvas ref={canvasRef} style={{ width: '100%', height: '80px', display: 'block' }} />
+      </div>
       <div style={{ display: 'flex', justifyContent: 'center', margin: '0.4rem 0 1rem' }}>
-        <button onClick={() => setMode(nextVisualizerMode)} style={{ fontSize: '0.75rem' }}>
+        <button className="btn-retro" onClick={() => setMode(nextVisualizerMode)}>
           Visualizer: {MODE_LABEL[mode]}
         </button>
       </div>

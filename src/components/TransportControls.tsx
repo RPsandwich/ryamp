@@ -1,4 +1,5 @@
 import type { DbTrack, RepeatMode } from '../types';
+import { Marquee } from './Marquee';
 
 interface TransportControlsProps {
   currentTrack: DbTrack | null;
@@ -25,19 +26,12 @@ export function TransportControls({
 }: TransportControlsProps) {
   return (
     <>
-      {currentTrack && (
-        <div
-          style={{
-            marginBottom: '1rem',
-            textAlign: 'center',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          Now playing: {currentTrack.title} — {currentTrack.artist}
-        </div>
-      )}
+      <div className="led-screen" style={{ padding: '0.5rem 0.75rem', marginBottom: '1rem' }}>
+        <Marquee
+          text={currentTrack ? `Now playing: ${currentTrack.title} \u2014 ${currentTrack.artist}` : 'ryamp \u2014 no track loaded'}
+          scroll={isPlaying && !!currentTrack}
+        />
+      </div>
 
       <div
         style={{
@@ -49,26 +43,27 @@ export function TransportControls({
           flexWrap: 'wrap',
         }}
       >
-        <button onClick={skipPrevious} disabled={!currentTrack} style={{ flexShrink: 0 }}>
+        <button className="btn-retro" onClick={skipPrevious} disabled={!currentTrack} style={{ flexShrink: 0 }}>
           &laquo; Prev
         </button>
-        <button onClick={togglePlay} disabled={!currentTrack} style={{ flexShrink: 0 }}>
+        <button className="btn-retro" onClick={togglePlay} disabled={!currentTrack} style={{ flexShrink: 0 }}>
           {isPlaying ? 'Pause' : 'Play'}
         </button>
-        <button onClick={skipNext} disabled={!currentTrack} style={{ flexShrink: 0 }}>
+        <button className="btn-retro" onClick={skipNext} disabled={!currentTrack} style={{ flexShrink: 0 }}>
           Next &raquo;
         </button>
         <button
+          className={shuffleOn ? 'btn-retro is-active' : 'btn-retro'}
           onClick={toggleShuffle}
-          style={{
-            flexShrink: 0,
-            fontWeight: shuffleOn ? 'bold' : 'normal',
-            backgroundColor: shuffleOn ? '#dde3ff' : undefined,
-          }}
+          style={{ flexShrink: 0 }}
         >
           Shuffle: {shuffleOn ? 'On' : 'Off'}
         </button>
-        <button onClick={cycleRepeat} style={{ flexShrink: 0 }}>
+        <button
+          className={repeatMode !== 'off' ? 'btn-retro is-active' : 'btn-retro'}
+          onClick={cycleRepeat}
+          style={{ flexShrink: 0 }}
+        >
           Repeat: {repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}
         </button>
       </div>

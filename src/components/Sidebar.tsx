@@ -34,32 +34,26 @@ export function Sidebar({
   importStatus,
 }: SidebarProps) {
   return (
-    <div style={{ width: '200px', flexShrink: 0 }}>
-      <h1 style={{ fontSize: '1.2rem', marginTop: 0 }}>ryamp</h1>
+    <div className="panel" style={{ width: '200px', flexShrink: 0 }}>
+      <div className="ryamp-logo">ryamp</div>
 
       <div
         onClick={() => selectPlaylist(null)}
-        style={{
-          cursor: 'pointer',
-          fontWeight: view.kind === 'library' ? 'bold' : 'normal',
-          padding: '0.25rem 0',
-        }}
+        className={view.kind === 'library' ? 'nav-item is-active' : 'nav-item'}
       >
         All Tracks ({libraryCount})
       </div>
 
       <div
         onClick={openAlbums}
-        style={{
-          cursor: 'pointer',
-          fontWeight: view.kind === 'albums' || view.kind === 'album' ? 'bold' : 'normal',
-          padding: '0.25rem 0',
-        }}
+        className={view.kind === 'albums' || view.kind === 'album' ? 'nav-item is-active' : 'nav-item'}
       >
         Albums ({albumsCount})
       </div>
 
-      <div style={{ marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Playlists</div>
+      <div className="section-label" style={{ marginTop: '1rem' }}>
+        Playlists
+      </div>
       {playlists.map((pl) => (
         <div
           key={pl.id}
@@ -67,22 +61,19 @@ export function Sidebar({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '0.15rem 0',
           }}
         >
           <span
             onClick={() => selectPlaylist(pl.id)}
-            style={{
-              cursor: 'pointer',
-              flex: 1,
-              fontWeight: view.kind === 'playlist' && view.id === pl.id ? 'bold' : 'normal',
-            }}
+            className={view.kind === 'playlist' && view.id === pl.id ? 'nav-item is-active' : 'nav-item'}
+            style={{ flex: 1 }}
           >
             {pl.name}
           </span>
           <button
+            className="btn-retro"
             onClick={() => deletePlaylist(pl.id)}
-            style={{ fontSize: '0.7rem' }}
+            style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}
             title="Delete playlist"
           >
             &times;
@@ -92,26 +83,29 @@ export function Sidebar({
 
       <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.25rem' }}>
         <input
+          type="text"
           value={newPlaylistName}
           onChange={(e) => setNewPlaylistName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && createPlaylist()}
           placeholder="New playlist"
-          style={{ width: '100%', fontSize: '0.8rem' }}
+          style={{ width: '100%' }}
         />
-        <button onClick={createPlaylist}>+</button>
+        <button className="btn-retro" onClick={createPlaylist}>
+          +
+        </button>
       </div>
 
       <div style={{ marginTop: '0.75rem' }}>
-        <button onClick={pickFolder} disabled={isImporting} style={{ width: '100%' }}>
+        <button className="btn-retro" onClick={pickFolder} disabled={isImporting} style={{ width: '100%' }}>
           {isImporting ? 'Importing...' : 'Import Music Folder'}
         </button>
         {selectedFolder && !importStatus && (
-          <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-faint)', marginTop: '0.25rem' }}>
             Last imported: {selectedFolder}
           </div>
         )}
         {importStatus && (
-          <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>{importStatus}</div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>{importStatus}</div>
         )}
       </div>
     </div>

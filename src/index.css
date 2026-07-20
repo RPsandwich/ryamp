@@ -1,111 +1,304 @@
+/*
+  ryamp — Phase 4 retro skin: cyberpunk neon chassis.
+  Dark purple/magenta hardware look with cyan glow accents, styled after
+  classic MP3-player skins (beveled panels, LED readouts, scrolling ticker).
+*/
+
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --bg-void: #0d0912;
+  --bg-panel: #180f22;
+  --bg-panel-raised: #22132f;
+  --bg-screen: #0a0611;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --accent-magenta: #ff2fb0;
+  --accent-cyan: #33fff0;
+  --accent-violet: #8b3dff;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --border-violet: #3f2358;
+  --border-violet-soft: rgba(63, 35, 88, 0.6);
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --text-primary: #f0d9ff;
+  --text-dim: #a68ec2;
+  --text-faint: #6b527f;
+
+  --glow-magenta: 0 0 6px rgba(255, 47, 176, 0.7), 0 0 16px rgba(255, 47, 176, 0.3);
+  --glow-cyan: 0 0 6px rgba(51, 255, 240, 0.7), 0 0 16px rgba(51, 255, 240, 0.28);
+
+  --font-ui: ui-monospace, 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, monospace;
+
+  color-scheme: dark;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
 body {
-  margin: 0;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(139, 61, 255, 0.25), transparent 45%),
+    radial-gradient(circle at 100% 0%, rgba(255, 47, 176, 0.12), transparent 40%),
+    var(--bg-void);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+button,
+input,
+select {
+  font-family: inherit;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
+/* Scrollbars, styled to match the chassis rather than the OS default. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
+::-webkit-scrollbar-track {
+  background: var(--bg-void);
 }
-p {
-  margin: 0;
+::-webkit-scrollbar-thumb {
+  background: var(--border-violet);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-violet);
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
+/* ---------- Wordmark ---------- */
+
+.ryamp-logo {
+  margin: 0 0 1.25rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent-magenta);
+  text-shadow: var(--glow-magenta);
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-violet);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 2px 10px rgba(0, 0, 0, 0.5);
+  padding: 1rem;
+}
+
+.section-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* ---------- LED / LCD screen bezel (visualizer, marquee) ---------- */
+
+.led-screen {
+  position: relative;
+  background: var(--bg-screen);
+  border: 1px solid var(--accent-violet);
   border-radius: 4px;
-  color: var(--text-h);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(139, 61, 255, 0.25);
+  overflow: hidden;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+.led-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.035) 0px,
+    rgba(255, 255, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* ---------- Nav items (sidebar) ---------- */
+
+.nav-item {
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 3px;
+  color: var(--text-dim);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.nav-item:hover {
+  color: var(--text-primary);
+  background: rgba(139, 61, 255, 0.1);
+}
+.nav-item.is-active {
+  color: var(--accent-magenta);
+  text-shadow: var(--glow-magenta);
+  background: rgba(255, 47, 176, 0.08);
+  font-weight: 600;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn-retro {
+  font-family: var(--font-ui);
+  background: linear-gradient(180deg, var(--bg-panel-raised), var(--bg-panel));
+  color: var(--text-primary);
+  border: 1px solid var(--border-violet);
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.btn-retro:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+}
+.btn-retro:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.btn-retro.is-active {
+  border-color: var(--accent-magenta);
+  color: var(--accent-magenta);
+  box-shadow: var(--glow-magenta);
+}
+
+input[type='text'],
+.input-retro {
+  background: var(--bg-screen);
+  border: 1px solid var(--border-violet);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+}
+input[type='text']:focus,
+.input-retro:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  box-shadow: var(--glow-cyan);
+}
+
+select {
+  background: var(--bg-screen);
+  border: 1px solid var(--border-violet);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 0.3rem 0.4rem;
+  font-size: 0.78rem;
+}
+
+/* ---------- Track table ---------- */
+
+.track-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.track-table th {
+  text-align: left;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border-violet);
+  cursor: pointer;
+  user-select: none;
+}
+.track-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border-violet-soft);
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.track-table tbody tr:hover td {
+  background: rgba(139, 61, 255, 0.08);
+}
+.track-table tr.is-current td {
+  background: rgba(255, 47, 176, 0.1);
+  box-shadow: inset 3px 0 0 var(--accent-magenta);
+  color: #fff;
+}
+
+.album-card {
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--border-violet-soft);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.album-card:hover {
+  background: rgba(139, 61, 255, 0.08);
+}
+.album-card .album-title {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.album-card .album-meta {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* ---------- Marquee ticker ---------- */
+
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+  position: relative;
+  height: 1.4em;
+}
+.marquee__copy {
+  display: inline-block;
+  color: var(--accent-cyan);
+  text-shadow: var(--glow-cyan);
+  letter-spacing: 0.04em;
+}
+.marquee__copy--scrolling {
+  position: absolute;
+  left: 0;
+  top: 0;
+  animation: marquee-loop var(--marquee-duration, 12s) linear infinite;
+}
+
+@keyframes marquee-loop {
+  from {
+    transform: translateX(var(--marquee-start, 100%));
+  }
+  to {
+    transform: translateX(var(--marquee-end, -100%));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee__copy--scrolling {
+    position: static;
+    animation: none;
+  }
+  .marquee {
+    text-overflow: ellipsis;
+  }
+  .marquee__copy {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
