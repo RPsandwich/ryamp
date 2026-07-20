@@ -254,6 +254,34 @@ export function useLibrary() {
     return results;
   };
 
+  // Removes tracks from the DB that are still recorded as living under
+  // `folderPath` but weren't found in this scan -- i.e. the file (or its
+  // whole album folder) was deleted or moved since the last import. Without
+  // this, a rescan only ever adds/refreshes tracks, so removed files linger
+  // in the library forever, unplayable.
+  const pruneRemovedTracks = async (folderPath: string, currentPaths: string[]): Promise<number> => {
+    const db = await Database.load('sqlite:ryamp.db');
+    const existing = await db.select<{ id: number; filepath: string }[]>(
+      'SELECT id, filepath FROM tracks WHERE filepath LIKE $1',
+      [`${folderPath}/%`]
+    );
+
+    const currentSet = new Set(currentPaths);
+    const staleIds = existing.filter((t) => !currentSet.has(t.filepath)).map((t) => t.id);
+
+    if (staleIds.length === 0) return 0;
+
+    // tauri-plugin-sql doesn't give us a clean "IN (...)" list binding, so
+    // delete one at a time -- these lists are small (a handful of removed
+    // files per rescan), not a real performance concern.
+    for (const id of staleIds) {
+      await db.execute('DELETE FROM playlist_tracks WHERE track_id = $1', [id]);
+      await db.execute('DELETE FROM tracks WHERE id = $1', [id]);
+    }
+
+    return staleIds.length;
+  };
+
   const scanFolder = async (folderPath: string): Promise<void> => {
     setIsImporting(true);
     setImportStatus('Scanning folder for MP3s...');
@@ -261,8 +289,16 @@ export function useLibrary() {
     try {
       const mp3s = await findMp3sRecursive(folderPath);
 
+      setImportStatus('Checking for removed tracks...');
+      const removed = await pruneRemovedTracks(folderPath, mp3s);
+
       if (mp3s.length === 0) {
-        setImportStatus('No MP3 files found in that folder.');
+        await loadLibrary();
+        setImportStatus(
+          removed > 0
+            ? `No MP3 files found \u00b7 removed ${removed} track${removed === 1 ? '' : 's'} no longer on disk`
+            : 'No MP3 files found in that folder.'
+        );
         return;
       }
 
@@ -276,6 +312,7 @@ export function useLibrary() {
 
       const parts = [`Added ${added} track${added === 1 ? '' : 's'}`];
       if (updated > 0) parts.push(`${updated} refreshed`);
+      if (removed > 0) parts.push(`${removed} removed`);
       if (failed > 0) parts.push(`${failed} failed to read`);
       setImportStatus(parts.join(' \u00b7 '));
     } finally {

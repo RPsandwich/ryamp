@@ -64,7 +64,7 @@ export function TrackTable({
       )}
 
       <div className="panel">
-        <span className="section-label">{headerLabel}</span>
+        <span className="section-label track-panel-header">{headerLabel}</span>
         <table className="track-table">
           <thead>
             <tr>

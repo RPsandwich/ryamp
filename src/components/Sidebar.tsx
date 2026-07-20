@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import type { DbPlaylist, View } from '../types';
+import type { ThemePreset } from '../skins/themes';
 
 interface SidebarProps {
   libraryCount: number;
@@ -15,6 +17,12 @@ interface SidebarProps {
   isImporting: boolean;
   selectedFolder: string | null;
   importStatus: string | null;
+  themes: ThemePreset[];
+  themeId: string;
+  setThemeId: (id: string) => void;
+  avatarSrc: string | null;
+  pickAvatarImage: () => void;
+  clearAvatar: () => void;
 }
 
 export function Sidebar({
@@ -32,7 +40,15 @@ export function Sidebar({
   isImporting,
   selectedFolder,
   importStatus,
+  themes,
+  themeId,
+  setThemeId,
+  avatarSrc,
+  pickAvatarImage,
+  clearAvatar,
 }: SidebarProps) {
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+
   return (
     <div className="panel" style={{ width: '200px', flexShrink: 0 }}>
       <div className="ryamp-logo">ryamp</div>
@@ -50,6 +66,60 @@ export function Sidebar({
       >
         Albums ({albumsCount})
       </div>
+
+      <div className="section-label" style={{ marginTop: '1rem' }}>
+        Skins
+      </div>
+      <button className="btn-retro" onClick={pickAvatarImage} style={{ width: '100%', marginBottom: '0.4rem' }}>
+        Avatar Skin
+      </button>
+      {avatarSrc && (
+        <button
+          className="btn-retro"
+          onClick={clearAvatar}
+          style={{ width: '100%', marginBottom: '0.4rem', fontSize: '0.7rem' }}
+        >
+          Remove Avatar
+        </button>
+      )}
+      <button
+        className={isThemePickerOpen ? 'btn-retro is-active' : 'btn-retro'}
+        onClick={() => setIsThemePickerOpen((v) => !v)}
+        style={{ width: '100%' }}
+      >
+        Theme
+      </button>
+      {isThemePickerOpen && (
+        <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          {themes.map((theme) => (
+            <button
+              key={theme.id}
+              onClick={() => setThemeId(theme.id)}
+              className={theme.id === themeId ? 'btn-retro is-active' : 'btn-retro'}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                justifyContent: 'flex-start',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: '0.7rem',
+                  height: '0.7rem',
+                  borderRadius: '50%',
+                  background: theme.colors.accentMagenta,
+                  boxShadow: `0 0 4px ${theme.colors.accentMagenta}`,
+                  flexShrink: 0,
+                }}
+              />
+              {theme.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="section-label" style={{ marginTop: '1rem' }}>
         Playlists

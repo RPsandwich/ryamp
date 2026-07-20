@@ -5,24 +5,30 @@
 */
 
 :root {
-  --bg-void: #0d0912;
-  --bg-panel: #180f22;
-  --bg-panel-raised: #22132f;
-  --bg-screen: #0a0611;
+  --bg-void: #050403;
+  --bg-panel: #100e08;
+  --bg-panel-raised: #191509;
+  --bg-screen: #030201;
 
-  --accent-magenta: #ff2fb0;
-  --accent-cyan: #33fff0;
-  --accent-violet: #8b3dff;
+  --accent-magenta: #ff003c;
+  --accent-cyan: #00f0ff;
+  --accent-violet: #fcee0a;
 
-  --border-violet: #3f2358;
-  --border-violet-soft: rgba(63, 35, 88, 0.6);
+  /* Raw "r, g, b" triplets so hover/glow overlays (rgba(var(--x-rgb), alpha))
+     actually follow the active theme instead of being hardcoded to one
+     palette's colors. Kept in sync with accent-magenta/-violet above. */
+  --accent-magenta-rgb: 255, 0, 60;
+  --accent-violet-rgb: 252, 238, 10;
+
+  --border-violet: #2e2812;
+  --border-violet-soft: rgba(46, 40, 18, 0.6);
 
   --text-primary: #f0d9ff;
   --text-dim: #a68ec2;
   --text-faint: #6b527f;
 
-  --glow-magenta: 0 0 6px rgba(255, 47, 176, 0.7), 0 0 16px rgba(255, 47, 176, 0.3);
-  --glow-cyan: 0 0 6px rgba(51, 255, 240, 0.7), 0 0 16px rgba(51, 255, 240, 0.28);
+  --glow-magenta: 0 0 6px rgba(255, 0, 60, 0.7), 0 0 16px rgba(255, 0, 60, 0.3);
+  --glow-cyan: 0 0 6px rgba(0, 240, 255, 0.7), 0 0 16px rgba(0, 240, 255, 0.28);
 
   --font-ui: ui-monospace, 'Cascadia Code', 'SFMono-Regular', 'Roboto Mono', Consolas, monospace;
 
@@ -42,8 +48,8 @@ body,
 
 body {
   background:
-    radial-gradient(circle at 15% -10%, rgba(139, 61, 255, 0.25), transparent 45%),
-    radial-gradient(circle at 100% 0%, rgba(255, 47, 176, 0.12), transparent 40%),
+    radial-gradient(circle at 15% -10%, rgba(var(--accent-violet-rgb), 0.25), transparent 45%),
+    radial-gradient(circle at 100% 0%, rgba(var(--accent-magenta-rgb), 0.12), transparent 40%),
     var(--bg-void);
   background-attachment: fixed;
   color: var(--text-primary);
@@ -113,7 +119,7 @@ select {
   background: var(--bg-screen);
   border: 1px solid var(--accent-violet);
   border-radius: 4px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(139, 61, 255, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(var(--accent-violet-rgb), 0.25);
   overflow: hidden;
 }
 
@@ -142,12 +148,12 @@ select {
 }
 .nav-item:hover {
   color: var(--text-primary);
-  background: rgba(139, 61, 255, 0.1);
+  background: rgba(var(--accent-violet-rgb), 0.1);
 }
 .nav-item.is-active {
   color: var(--accent-magenta);
   text-shadow: var(--glow-magenta);
-  background: rgba(255, 47, 176, 0.08);
+  background: rgba(var(--accent-magenta-rgb), 0.08);
   font-weight: 600;
 }
 
@@ -212,7 +218,26 @@ select {
   border-collapse: collapse;
   font-size: 0.85rem;
 }
+
+/* The "Library" / "Playlist Name" / etc. label above the table. Sticks to
+   the top of the scrolling track-list pane so it stays visible while rows
+   scroll underneath it. Height is fixed (rather than relying on margin) so
+   the table header row below has a precise, non-fragile offset to stick to. */
+.track-panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  background: var(--bg-panel);
+}
+
 .track-table th {
+  position: sticky;
+  top: 2rem; /* sits directly below .track-panel-header, see above */
+  z-index: 2;
+  background: var(--bg-panel);
   text-align: left;
   color: var(--accent-cyan);
   text-transform: uppercase;
@@ -231,10 +256,10 @@ select {
   color: var(--text-primary);
 }
 .track-table tbody tr:hover td {
-  background: rgba(139, 61, 255, 0.08);
+  background: rgba(var(--accent-violet-rgb), 0.08);
 }
 .track-table tr.is-current td {
-  background: rgba(255, 47, 176, 0.1);
+  background: rgba(var(--accent-magenta-rgb), 0.1);
   box-shadow: inset 3px 0 0 var(--accent-magenta);
   color: #fff;
 }
@@ -246,7 +271,7 @@ select {
   transition: background 0.15s ease;
 }
 .album-card:hover {
-  background: rgba(139, 61, 255, 0.08);
+  background: rgba(var(--accent-violet-rgb), 0.08);
 }
 .album-card .album-title {
   font-weight: 700;
