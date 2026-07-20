@@ -12,9 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "ryamp",
-        "width": 1000,
-        "height": 800,
+        "title": "Toriamp",
+        "width": 850,
+        "height": 950,
         "resizable": true,
         "fullscreen": false
       }

@@ -28,7 +28,7 @@ export function TransportControls({
     <>
       <div className="led-screen" style={{ padding: '0.5rem 0.75rem', marginBottom: '1rem' }}>
         <Marquee
-          text={currentTrack ? `Now playing: ${currentTrack.title} \u2014 ${currentTrack.artist}` : 'ryamp \u2014 no track loaded'}
+          text={currentTrack ? `Now playing: ${currentTrack.title} \u2014 ${currentTrack.artist}` : 'Toriamp \u2014 no track loaded'}
           scroll={isPlaying && !!currentTrack}
         />
       </div>

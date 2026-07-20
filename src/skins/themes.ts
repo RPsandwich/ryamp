@@ -45,7 +45,7 @@ export const THEMES: ThemePreset[] = [
   },
   {
     id: 'lcd-green',
-    label: 'Classic LCD Green',
+    label: 'LCD Green',
     colors: {
       accentMagenta: '#39ff6a',
       accentCyan: '#a8ffcf',
@@ -73,6 +73,28 @@ export const THEMES: ThemePreset[] = [
       bgScreen: '#100b1e',
       glowMagenta: '0 0 6px rgba(255, 113, 206, 0.7), 0 0 16px rgba(255, 113, 206, 0.3)',
       glowCyan: '0 0 6px rgba(1, 205, 254, 0.7), 0 0 16px rgba(1, 205, 254, 0.28)',
+    },
+  },
+  {
+    id: 'vampire',
+    label: 'Vampire',
+    // Mostly black and red, purple pushed way down to near-black so it just
+    // reads as shadow rather than its own hue. accentCyan still does double
+    // duty as the "readable light accent" role (column headers, marquee
+    // text) -- here a pale rose/moonlight tone rather than true cyan or
+    // lavender, since it needs to stay light enough for contrast against
+    // near-black backgrounds.
+    colors: {
+      accentMagenta: '#c81e3d',
+      accentCyan: '#e6c2c2',
+      accentViolet: '#5c1420',
+      borderViolet: '#1f0a0e',
+      bgVoid: '#0a0505',
+      bgPanel: '#140808',
+      bgPanelRaised: '#1e0d0d',
+      bgScreen: '#070303',
+      glowMagenta: '0 0 6px rgba(200, 30, 61, 0.7), 0 0 16px rgba(200, 30, 61, 0.3)',
+      glowCyan: '0 0 6px rgba(230, 194, 194, 0.7), 0 0 16px rgba(230, 194, 194, 0.28)',
     },
   },
 ];

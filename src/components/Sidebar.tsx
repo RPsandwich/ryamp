@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { DbPlaylist, View } from '../types';
 import type { ThemePreset } from '../skins/themes';
+import type { BannerPreset } from '../skins/banners';
+import type { UserBanner } from '../skins/userBanners';
+import { labelFromFilename } from '../skins/userBanners';
+import type { AvatarSource } from '../hooks/useSkin';
 
 interface SidebarProps {
   libraryCount: number;
@@ -20,8 +24,14 @@ interface SidebarProps {
   themes: ThemePreset[];
   themeId: string;
   setThemeId: (id: string) => void;
+  bannerPresets: BannerPreset[];
+  userBanners: UserBanner[];
+  avatarSource: AvatarSource | null;
   avatarSrc: string | null;
   pickAvatarImage: () => void;
+  selectBannerPreset: (id: string) => void;
+  selectUserBanner: (path: string) => void;
+  deleteUserBanner: (path: string) => void;
   clearAvatar: () => void;
 }
 
@@ -43,15 +53,22 @@ export function Sidebar({
   themes,
   themeId,
   setThemeId,
+  bannerPresets,
+  userBanners,
+  avatarSource,
   avatarSrc,
   pickAvatarImage,
+  selectBannerPreset,
+  selectUserBanner,
+  deleteUserBanner,
   clearAvatar,
 }: SidebarProps) {
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
 
   return (
     <div className="panel" style={{ width: '200px', flexShrink: 0 }}>
-      <div className="ryamp-logo">ryamp</div>
+      <div className="ryamp-logo">Toriamp</div>
 
       <div
         onClick={() => selectPlaylist(null)}
@@ -70,18 +87,98 @@ export function Sidebar({
       <div className="section-label" style={{ marginTop: '1rem' }}>
         Skins
       </div>
-      <button className="btn-retro" onClick={pickAvatarImage} style={{ width: '100%', marginBottom: '0.4rem' }}>
+
+      <button
+        className={isAvatarPickerOpen ? 'btn-retro is-active' : 'btn-retro'}
+        onClick={() => setIsAvatarPickerOpen((v) => !v)}
+        style={{ width: '100%', marginBottom: '0.4rem' }}
+      >
         Avatar Skin
       </button>
-      {avatarSrc && (
-        <button
-          className="btn-retro"
-          onClick={clearAvatar}
-          style={{ width: '100%', marginBottom: '0.4rem', fontSize: '0.7rem' }}
-        >
-          Remove Avatar
-        </button>
+      {isAvatarPickerOpen && (
+        <div style={{ marginBottom: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+          {bannerPresets.map((preset) => (
+            <button
+              key={preset.id}
+              onClick={() => selectBannerPreset(preset.id)}
+              className={
+                avatarSource?.type === 'preset' && avatarSource.id === preset.id ? 'btn-retro is-active' : 'btn-retro'
+              }
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                justifyContent: 'flex-start',
+                padding: '0.3rem',
+              }}
+            >
+              <img
+                src={preset.src}
+                alt=""
+                aria-hidden="true"
+                style={{ width: '2rem', height: '1.25rem', objectFit: 'cover', borderRadius: '2px', flexShrink: 0 }}
+              />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {preset.label}
+              </span>
+            </button>
+          ))}
+
+          {userBanners.length > 0 && (
+            <div style={{ fontSize: '0.65rem', color: 'var(--text-faint)', marginTop: '0.2rem' }}>Your uploads</div>
+          )}
+          {userBanners.map((banner) => (
+            <div key={banner.path} style={{ display: 'flex', gap: '0.25rem', alignItems: 'stretch' }}>
+              <button
+                onClick={() => selectUserBanner(banner.path)}
+                className={
+                  avatarSource?.type === 'custom' && avatarSource.path === banner.path
+                    ? 'btn-retro is-active'
+                    : 'btn-retro'
+                }
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  justifyContent: 'flex-start',
+                  padding: '0.3rem',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {labelFromFilename(banner.fileName)}
+                </span>
+              </button>
+              <button
+                className="btn-retro"
+                onClick={() => deleteUserBanner(banner.path)}
+                title="Delete this uploaded image"
+                style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', flexShrink: 0 }}
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+
+          {bannerPresets.length === 0 && userBanners.length === 0 && (
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-faint)' }}>
+              No built-in banners yet -- drop images in src/assets/banners/.
+            </div>
+          )}
+
+          <button className="btn-retro" onClick={pickAvatarImage} style={{ width: '100%', marginTop: '0.2rem' }}>
+            Upload Custom...
+          </button>
+          {avatarSrc && (
+            <button className="btn-retro" onClick={clearAvatar} style={{ width: '100%', fontSize: '0.7rem' }}>
+              Hide Avatar
+            </button>
+          )}
+        </div>
       )}
+
       <button
         className={isThemePickerOpen ? 'btn-retro is-active' : 'btn-retro'}
         onClick={() => setIsThemePickerOpen((v) => !v)}

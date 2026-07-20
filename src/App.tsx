@@ -1,7 +1,7 @@
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useVisualizer } from './hooks/useVisualizer';
 import { useLibrary } from './hooks/useLibrary';
-import { useSkin } from './hooks/useSkin';
+import { useSkin } from './skins/useSkin';
 import { Sidebar } from './components/Sidebar';
 import { Visualizer } from './components/Visualizer';
 import { TransportControls } from './components/TransportControls';
@@ -40,8 +40,14 @@ function App() {
             themes={skin.themes}
             themeId={skin.themeId}
             setThemeId={skin.setThemeId}
+            bannerPresets={skin.bannerPresets}
+            userBanners={skin.userBanners}
+            avatarSource={skin.avatarSource}
             avatarSrc={skin.avatarSrc}
             pickAvatarImage={skin.pickAvatarImage}
+            selectBannerPreset={skin.selectBannerPreset}
+            selectUserBanner={skin.selectUserBanner}
+            deleteUserBanner={skin.deleteUserBanner}
             clearAvatar={skin.clearAvatar}
           />
         </div>
