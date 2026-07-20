@@ -65,7 +65,7 @@ function App() {
   const currentBufferRef = useRef<AudioBuffer | null>(null);
   const playbackOffsetRef = useRef(0);
   const contextStartTimeRef = useRef(0);
-  const manualStopRef = useRef(false);
+  const playbackGenerationRef = useRef(0);
   const currentQueueRef = useRef<DbTrack[]>([]);
   const shuffleHistoryRef = useRef<DbTrack[]>([]);
   const repeatModeRef = useRef<RepeatMode>('off');
@@ -252,9 +252,11 @@ function App() {
   };
 
   const stopCurrentSource = () => {
+    // Invalidate whatever source is currently "claimed" — this doesn't rely on
+    // that source's 'ended' event ever firing (WebKitGTK doesn't reliably fire
+    // it after stop()+disconnect()), so it works even if that event never comes.
+    playbackGenerationRef.current += 1;
     if (sourceNodeRef.current) {
-      console.log('[ryamp] stopCurrentSource: had a live node, setting manualStop=true');
-      manualStopRef.current = true;
       try {
         sourceNodeRef.current.stop();
       } catch {
@@ -262,8 +264,6 @@ function App() {
       }
       sourceNodeRef.current.disconnect();
       sourceNodeRef.current = null;
-    } else {
-      console.log('[ryamp] stopCurrentSource: no live node, nothing to do');
     }
   };
 
@@ -273,21 +273,19 @@ function App() {
     source.buffer = buffer;
     source.connect(analyserRef.current!);
 
+    // Claim a fresh generation for this specific source. Any earlier source's
+    // 'ended' callback — whether it fires promptly, late, or not at all — will
+    // see a mismatch here and no-op, instead of relying on a shared boolean
+    // flag that only gets reset if that earlier callback actually runs.
+    const myGeneration = ++playbackGenerationRef.current;
+
     source.onended = () => {
-      console.log('[ryamp] onended fired', { trackId: track.id, manualStop: manualStopRef.current });
-      if (manualStopRef.current) {
-        manualStopRef.current = false;
-        console.log('[ryamp] treated as MANUAL stop — not advancing');
+      if (playbackGenerationRef.current !== myGeneration) {
         return;
       }
-      // Track actually finished naturally — advance the queue.
-      // Clear the (now-dead) source ref so the next track's stopCurrentSource()
-      // cleanup doesn't mistake this for something that needs a manual-stop flag,
-      // which would otherwise swallow the *following* track's natural end.
-      console.log('[ryamp] treated as NATURAL end — advancing', { repeatMode: repeatModeRef.current, shuffleOn: shuffleOnRef.current });
       sourceNodeRef.current = null;
       playbackOffsetRef.current = 0;
-      advanceAfterTrackEnded(track).catch((err) => console.error('[ryamp] advanceAfterTrackEnded threw', err));
+      advanceAfterTrackEnded(track).catch((err) => console.error('[ryamp] advanceAfterTrackEnded failed:', err));
     };
 
     source.start(0, offsetSeconds);
@@ -300,7 +298,6 @@ function App() {
   // Decodes the whole file to PCM up front and plays it via AudioBufferSourceNode.
   // (Avoids <audio> + Blob-URL streaming, which stutters on longer tracks under WebKitGTK.)
   const playTrack = async (track: DbTrack) => {
-    console.log('[ryamp] playTrack starting', { trackId: track.id, title: track.title });
     setCurrentTrack(track);
     ensureAudioGraph();
     stopCurrentSource();
@@ -314,7 +311,6 @@ function App() {
     }
 
     playFromOffset(track, audioBuffer, 0);
-    console.log('[ryamp] playTrack: playback started', { trackId: track.id });
   };
 
   // Sets the active playback queue (the list a track was chosen from) and plays a track from it.
@@ -336,21 +332,15 @@ function App() {
   // on natural end, not on a manual skip).
   const playRelative = async (fromTrack: DbTrack, direction: 1 | -1, opts?: { auto?: boolean }) => {
     const queue = currentQueueRef.current;
-    console.log('[ryamp] playRelative called', { fromTrackId: fromTrack.id, direction, auto: opts?.auto, queueLength: queue.length, shuffleOn: shuffleOnRef.current, repeatMode: repeatModeRef.current });
-    if (queue.length === 0) {
-      console.log('[ryamp] playRelative: empty queue, bailing');
-      return;
-    }
+    if (queue.length === 0) return;
 
     const currentIndex = queue.findIndex((t) => t.id === fromTrack.id);
     const safeIndex = currentIndex === -1 ? 0 : currentIndex;
-    console.log('[ryamp] playRelative: found index', { currentIndex, safeIndex });
 
     if (shuffleOnRef.current) {
       if (direction === 1) {
         shuffleHistoryRef.current.push(fromTrack);
         const nextIndex = pickRandomIndex(queue.length, safeIndex);
-        console.log('[ryamp] shuffle: picked next index', nextIndex, 'trackId', queue[nextIndex]?.id);
         await playTrackFromQueue(queue[nextIndex], queue);
       } else {
         const prevTrack = shuffleHistoryRef.current.pop();
@@ -367,18 +357,15 @@ function App() {
       if (repeatModeRef.current === 'all') {
         targetIndex = 0;
       } else {
-        console.log('[ryamp] playRelative: end of queue, repeat off — stopping');
         if (opts?.auto) setIsPlaying(false); // reached the end of the queue naturally
         return;
       }
     }
 
-    console.log('[ryamp] playRelative: advancing to index', targetIndex, 'trackId', queue[targetIndex]?.id);
     await playTrackFromQueue(queue[targetIndex], queue);
   };
 
   const advanceAfterTrackEnded = async (finishedTrack: DbTrack) => {
-    console.log('[ryamp] advanceAfterTrackEnded', { finishedTrackId: finishedTrack.id, repeatMode: repeatModeRef.current });
     if (repeatModeRef.current === 'one') {
       await playTrackFromQueue(finishedTrack, currentQueueRef.current);
       return;
