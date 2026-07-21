@@ -1,10 +1,12 @@
 import type { RefObject } from 'react';
-import { nextVisualizerMode, type VisualizerMode } from '../hooks/useVisualizer';
+import { nextVisualizerMode, nextColorMode, type VisualizerMode, type VisualizerColorMode } from '../hooks/useVisualizer';
 
 interface VisualizerProps {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   mode: VisualizerMode;
   setMode: (updater: (m: VisualizerMode) => VisualizerMode) => void;
+  colorMode: VisualizerColorMode;
+  setColorMode: (updater: (m: VisualizerColorMode) => VisualizerColorMode) => void;
 }
 
 const MODE_LABEL: Record<VisualizerMode, string> = {
@@ -13,7 +15,15 @@ const MODE_LABEL: Record<VisualizerMode, string> = {
   plasma: 'Plasma',
 };
 
-export function Visualizer({ canvasRef, mode, setMode }: VisualizerProps) {
+const COLOR_MODE_LABEL: Record<VisualizerColorMode, string> = {
+  rainbow: 'Rainbow',
+  red: 'Red',
+  yellow: 'Yellow',
+  green: 'Green',
+  blue: 'Blue',
+};
+
+export function Visualizer({ canvasRef, mode, setMode, colorMode, setColorMode }: VisualizerProps) {
   return (
     <>
       {/*
@@ -25,9 +35,12 @@ export function Visualizer({ canvasRef, mode, setMode }: VisualizerProps) {
       <div className="led-screen">
         <canvas ref={canvasRef} style={{ width: '100%', height: '80px', display: 'block' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', margin: '0.4rem 0 1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', margin: '0.4rem 0 1rem' }}>
         <button className="btn-retro" onClick={() => setMode(nextVisualizerMode)}>
           Visualizer: {MODE_LABEL[mode]}
+        </button>
+        <button className="btn-retro" onClick={() => setColorMode(nextColorMode)}>
+          Color: {COLOR_MODE_LABEL[colorMode]}
         </button>
       </div>
     </>

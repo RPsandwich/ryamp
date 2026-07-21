@@ -5,6 +5,18 @@
 */
 
 :root {
+  --color-bg: #ffffff;
+  --color-sidebar-bg: #ffffff;
+  --color-text: #000000;
+  --color-text-muted: #666666;
+  --color-accent: #4a6fd4;
+  --color-accent-bg: #dde3ff;
+  --color-button-bg: #f0f0f0;
+  --color-button-text: #000000;
+  --color-border: #cccccc;
+  --color-row-highlight: #eeeeee;
+  --color-visualizer-bg: #111111;
+  --color-danger: #c0392b;
   --bg-void: #050403;
   --bg-panel: #100e08;
   --bg-panel-raised: #191509;

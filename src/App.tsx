@@ -1,7 +1,7 @@
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useVisualizer } from './hooks/useVisualizer';
 import { useLibrary } from './hooks/useLibrary';
-import { useSkin } from './skins/useSkin';
+import { useSkin } from './hooks/useSkin';
 import { Sidebar } from './components/Sidebar';
 import { Visualizer } from './components/Visualizer';
 import { TransportControls } from './components/TransportControls';
@@ -40,6 +40,8 @@ function App() {
             themes={skin.themes}
             themeId={skin.themeId}
             setThemeId={skin.setThemeId}
+            saveCustomTheme={skin.saveCustomTheme}
+            deleteCustomTheme={skin.deleteCustomTheme}
             bannerPresets={skin.bannerPresets}
             userBanners={skin.userBanners}
             avatarSource={skin.avatarSource}
@@ -58,6 +60,8 @@ function App() {
               canvasRef={visualizer.visualizerCanvasRef}
               mode={visualizer.visualizerMode}
               setMode={visualizer.setVisualizerMode}
+              colorMode={visualizer.colorMode}
+              setColorMode={visualizer.setColorMode}
             />
 
             <TransportControls

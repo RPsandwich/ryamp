@@ -1,9 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { THEMES, type ThemeColors, type ThemePreset } from './themes';
-import { BANNER_PRESETS } from './banners';
+import { THEMES, type ThemeColors, type ThemePreset } from '../skins/themes';
+import { BANNER_PRESETS } from '../skins/banners';
 import { listUserBanners, importUserBanner, removeUserBanner, type UserBanner } from '../skins/userBanners';
+import {
+  loadCustomThemes,
+  saveCustomTheme as saveCustomThemeToDb,
+  deleteCustomTheme as deleteCustomThemeFromDb,
+  type EditableThemeColors,
+} from '../skins/customThemes';
 
 const THEME_STORAGE_KEY = 'ryamp.themeId';
 const AVATAR_STORAGE_KEY = 'ryamp.avatarSource';
@@ -102,19 +108,35 @@ export function useSkin() {
   const [themeId, setThemeIdState] = useState<string>(loadStoredThemeId);
   const [avatarSource, setAvatarSource] = useState<AvatarSource | null>(loadStoredAvatarSource);
   const [userBanners, setUserBanners] = useState<UserBanner[]>([]);
+  const [customThemes, setCustomThemes] = useState<ThemePreset[]>([]);
 
-  // Re-applies whenever the selected theme changes (including on first
-  // mount, restoring whatever was saved from last time).
+  // Built-in presets + whatever's been saved to the DB, combined -- this is
+  // the list the Theme picker actually shows, and what theme-id lookups
+  // search against (a custom theme's id, e.g. "custom-3", would never
+  // resolve against THEMES alone). Memoized so the effect below only
+  // re-runs when the actual theme set changes, not on every render.
+  const allThemes = useMemo(() => [...THEMES, ...customThemes], [customThemes]);
+
+  // Re-applies whenever the selected theme (or the custom theme list, since
+  // a newly-saved theme might be the one that's now selected) changes,
+  // including on first mount, restoring whatever was saved from last time.
   useEffect(() => {
-    const theme = THEMES.find((t) => t.id === themeId) ?? THEMES[0];
+    const theme = allThemes.find((t) => t.id === themeId) ?? THEMES[0];
     applyTheme(theme);
-  }, [themeId]);
+  }, [themeId, allThemes]);
 
   // Loads whatever's already in the persistent upload gallery on startup.
   useEffect(() => {
     listUserBanners()
       .then(setUserBanners)
       .catch((err) => console.error('Failed to load user banner gallery:', err));
+  }, []);
+
+  // Loads any previously-saved custom themes from the DB on startup.
+  useEffect(() => {
+    loadCustomThemes()
+      .then(setCustomThemes)
+      .catch((err) => console.error('Failed to load custom themes:', err));
   }, []);
 
   const setThemeId = useCallback((id: string) => {
@@ -192,10 +214,37 @@ export function useSkin() {
     [avatarSource]
   );
 
+  const saveCustomTheme = useCallback(async (name: string, colors: EditableThemeColors) => {
+    try {
+      const preset = await saveCustomThemeToDb(name, colors);
+      setCustomThemes((prev) => [...prev, preset]);
+      setThemeId(preset.id);
+    } catch (err) {
+      console.error('Failed to save custom theme:', err);
+    }
+  }, [setThemeId]);
+
+  const deleteCustomTheme = useCallback(
+    async (id: string) => {
+      try {
+        await deleteCustomThemeFromDb(id);
+        setCustomThemes((prev) => prev.filter((t) => t.id !== id));
+        if (themeId === id) {
+          setThemeId(THEMES[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to delete custom theme:', err);
+      }
+    },
+    [themeId, setThemeId]
+  );
+
   return {
-    themes: THEMES,
+    themes: allThemes,
     themeId,
     setThemeId,
+    saveCustomTheme,
+    deleteCustomTheme,
     bannerPresets: BANNER_PRESETS,
     userBanners,
     avatarSource,

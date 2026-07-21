@@ -5,6 +5,8 @@ import type { BannerPreset } from '../skins/banners';
 import type { UserBanner } from '../skins/userBanners';
 import { labelFromFilename } from '../skins/userBanners';
 import type { AvatarSource } from '../hooks/useSkin';
+import type { EditableThemeColors } from '../skins/customThemes';
+import { ThemeCreator } from './ThemeCreator';
 
 interface SidebarProps {
   libraryCount: number;
@@ -24,6 +26,8 @@ interface SidebarProps {
   themes: ThemePreset[];
   themeId: string;
   setThemeId: (id: string) => void;
+  saveCustomTheme: (name: string, colors: EditableThemeColors) => void;
+  deleteCustomTheme: (id: string) => void;
   bannerPresets: BannerPreset[];
   userBanners: UserBanner[];
   avatarSource: AvatarSource | null;
@@ -53,6 +57,8 @@ export function Sidebar({
   themes,
   themeId,
   setThemeId,
+  saveCustomTheme,
+  deleteCustomTheme,
   bannerPresets,
   userBanners,
   avatarSource,
@@ -65,6 +71,9 @@ export function Sidebar({
 }: SidebarProps) {
   const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [isCreatingTheme, setIsCreatingTheme] = useState(false);
+
+  const activeTheme = themes.find((t) => t.id === themeId) ?? themes[0];
 
   return (
     <div className="panel" style={{ width: '200px', flexShrink: 0 }}>
@@ -188,33 +197,79 @@ export function Sidebar({
       </button>
       {isThemePickerOpen && (
         <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-          {themes.map((theme) => (
+          {themes.map((theme) => {
+            const isCustom = theme.id.startsWith('custom-');
+            return (
+              <div key={theme.id} style={{ display: 'flex', gap: '0.25rem', alignItems: 'stretch' }}>
+                <button
+                  onClick={() => setThemeId(theme.id)}
+                  className={theme.id === themeId ? 'btn-retro is-active' : 'btn-retro'}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    justifyContent: 'flex-start',
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: '0.7rem',
+                      height: '0.7rem',
+                      borderRadius: '50%',
+                      background: theme.colors.accentMagenta,
+                      boxShadow: `0 0 4px ${theme.colors.accentMagenta}`,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {theme.label}
+                  </span>
+                </button>
+                {isCustom && (
+                  <button
+                    className="btn-retro"
+                    onClick={() => deleteCustomTheme(theme.id)}
+                    title="Delete this theme"
+                    style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', flexShrink: 0 }}
+                  >
+                    &times;
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          {!isCreatingTheme && (
             <button
-              key={theme.id}
-              onClick={() => setThemeId(theme.id)}
-              className={theme.id === themeId ? 'btn-retro is-active' : 'btn-retro'}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                justifyContent: 'flex-start',
-              }}
+              className="btn-retro"
+              onClick={() => setIsCreatingTheme(true)}
+              style={{ width: '100%', marginTop: '0.2rem' }}
             >
-              <span
-                aria-hidden="true"
-                style={{
-                  width: '0.7rem',
-                  height: '0.7rem',
-                  borderRadius: '50%',
-                  background: theme.colors.accentMagenta,
-                  boxShadow: `0 0 4px ${theme.colors.accentMagenta}`,
-                  flexShrink: 0,
-                }}
-              />
-              {theme.label}
+              + Create Theme
             </button>
-          ))}
+          )}
+          {isCreatingTheme && (
+            <ThemeCreator
+              initialColors={{
+                accentMagenta: activeTheme.colors.accentMagenta,
+                accentCyan: activeTheme.colors.accentCyan,
+                accentViolet: activeTheme.colors.accentViolet,
+                borderViolet: activeTheme.colors.borderViolet,
+                bgVoid: activeTheme.colors.bgVoid,
+                bgPanel: activeTheme.colors.bgPanel,
+                bgPanelRaised: activeTheme.colors.bgPanelRaised,
+                bgScreen: activeTheme.colors.bgScreen,
+              }}
+              onSave={(name, colors) => {
+                saveCustomTheme(name, colors);
+                setIsCreatingTheme(false);
+              }}
+              onClose={() => setIsCreatingTheme(false)}
+            />
+          )}
         </div>
       )}
 

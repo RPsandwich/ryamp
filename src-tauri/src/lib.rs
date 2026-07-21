@@ -34,6 +34,31 @@ pub fn run() {
             );
         ",
         kind: MigrationKind::Up,
+    }, Migration {
+        // Intentionally version 3, not 2 -- a different, incompatible
+        // "version 2" migration (a `themes` table with a generic
+        // light-mode color scheme) may already be recorded as applied
+        // in some environments. Using 3 guarantees this one actually
+        // runs regardless, rather than silently being skipped as
+        // "already applied" if a version-2 record already exists.
+        version: 3,
+        description: "create_custom_themes_table",
+        sql: "
+            CREATE TABLE custom_themes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                accent_magenta TEXT NOT NULL,
+                accent_cyan TEXT NOT NULL,
+                accent_violet TEXT NOT NULL,
+                border_violet TEXT NOT NULL,
+                bg_void TEXT NOT NULL,
+                bg_panel TEXT NOT NULL,
+                bg_panel_raised TEXT NOT NULL,
+                bg_screen TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+        ",
+        kind: MigrationKind::Up,
     }];
 
     tauri::Builder::default()
