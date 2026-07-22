@@ -9,9 +9,18 @@ export function nextVisualizerMode(mode: VisualizerMode): VisualizerMode {
   return MODE_ORDER[(i + 1) % MODE_ORDER.length];
 }
 
-export type VisualizerColorMode = 'rainbow' | 'red' | 'yellow' | 'green' | 'blue';
+export type VisualizerColorMode = 'rainbow' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'violet';
 
-const COLOR_MODE_ORDER: VisualizerColorMode[] = ['rainbow', 'red', 'yellow', 'green', 'blue'];
+const COLOR_MODE_ORDER: VisualizerColorMode[] = [
+  'rainbow',
+  'red',
+  'orange',
+  'yellow',
+  'green',
+  'blue',
+  'indigo',
+  'violet',
+];
 
 export function nextColorMode(mode: VisualizerColorMode): VisualizerColorMode {
   const i = COLOR_MODE_ORDER.indexOf(mode);
@@ -23,9 +32,12 @@ export function nextColorMode(mode: VisualizerColorMode): VisualizerColorMode {
 // than textbook-exact red/yellow/green/blue.
 const FIXED_HUES: Record<Exclude<VisualizerColorMode, 'rainbow'>, number> = {
   red: 355,
+  orange: 25,
   yellow: 50,
   green: 135,
   blue: 205,
+  indigo: 255,
+  violet: 285,
 };
 
 // Visualizer loop — reads directly from whatever AnalyserNode the audio

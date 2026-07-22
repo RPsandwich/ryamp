@@ -18,9 +18,12 @@ const MODE_LABEL: Record<VisualizerMode, string> = {
 const COLOR_MODE_LABEL: Record<VisualizerColorMode, string> = {
   rainbow: 'Rainbow',
   red: 'Red',
+  orange: 'Orange',
   yellow: 'Yellow',
   green: 'Green',
   blue: 'Blue',
+  indigo: 'Indigo',
+  violet: 'Violet',
 };
 
 export function Visualizer({ canvasRef, mode, setMode, colorMode, setColorMode }: VisualizerProps) {
