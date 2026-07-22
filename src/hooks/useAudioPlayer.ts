@@ -24,6 +24,8 @@ export function useAudioPlayer() {
   const [currentTrack, setCurrentTrack] = useState<DbTrack | null>(null);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [shuffleOn, setShuffleOn] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Keep refs in sync so the long-lived `onended` callback (created when a track
   // starts, but firing whenever it finishes) always reads the latest mode rather
@@ -35,6 +37,26 @@ export function useAudioPlayer() {
   useEffect(() => {
     shuffleOnRef.current = shuffleOn;
   }, [shuffleOn]);
+
+  // Drives the scrub bar's position. Only runs while actually playing --
+  // when paused, currentTime is set directly (see togglePlay/seek) instead
+  // of via this loop, so it doesn't drift or need its own pause handling.
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let raf: number;
+    const tick = () => {
+      const ctx = audioContextRef.current;
+      if (ctx) {
+        const elapsed = ctx.currentTime - contextStartTimeRef.current;
+        setCurrentTime(playbackOffsetRef.current + elapsed);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying]);
 
   const ensureAudioGraph = () => {
     if (audioContextRef.current) return;
@@ -105,6 +127,8 @@ export function useAudioPlayer() {
     const fileBytes = await readFile(track.filepath);
     const audioBuffer = await audioContextRef.current!.decodeAudioData(fileBytes.buffer.slice(0));
     currentBufferRef.current = audioBuffer;
+    setDuration(audioBuffer.duration);
+    setCurrentTime(0);
 
     if (audioContextRef.current!.state === 'suspended') {
       await audioContextRef.current!.resume();
@@ -199,9 +223,27 @@ export function useAudioPlayer() {
       playbackOffsetRef.current += elapsed;
       stopCurrentSource();
       setIsPlaying(false);
+      setCurrentTime(playbackOffsetRef.current);
     } else {
       playFromOffset(currentTrack, currentBufferRef.current, playbackOffsetRef.current);
     }
+  };
+
+  // Jumps playback to an absolute position (seconds) for the scrub bar.
+  // If already playing, restarts the source from the new offset so audio
+  // keeps flowing; if paused, just moves the stored offset so the next
+  // togglePlay() resumes from there.
+  const seek = (time: number) => {
+    if (!currentTrack || !currentBufferRef.current) return;
+    const clamped = Math.max(0, Math.min(time, currentBufferRef.current.duration));
+
+    if (isPlaying) {
+      stopCurrentSource();
+      playFromOffset(currentTrack, currentBufferRef.current, clamped);
+    } else {
+      playbackOffsetRef.current = clamped;
+    }
+    setCurrentTime(clamped);
   };
 
   return {
@@ -210,11 +252,14 @@ export function useAudioPlayer() {
     currentTrack,
     repeatMode,
     shuffleOn,
+    duration,
+    currentTime,
     selectAndPlay,
     skipNext,
     skipPrevious,
     toggleShuffle,
     cycleRepeat,
     togglePlay,
+    seek,
   };
 }

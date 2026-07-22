@@ -198,6 +198,56 @@ select {
   box-shadow: var(--glow-magenta);
 }
 
+/* ---------- Scrub bar (track progress / seek) ---------- */
+
+.scrub-bar {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border-violet);
+  cursor: pointer;
+  outline: none;
+  /* --fill is set inline per-render to the playback percentage; Firefox
+     ignores this (see ::-moz-range-progress below) so both engines show
+     an accurate filled portion instead of just a flat track. */
+  background: linear-gradient(to right, var(--accent-cyan) var(--fill, 0%), var(--bg-panel-raised) var(--fill, 0%));
+}
+.scrub-bar:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.scrub-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-magenta);
+  box-shadow: var(--glow-magenta);
+  border: none;
+  margin-top: -3px;
+}
+.scrub-bar::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-panel-raised);
+  border: none;
+}
+.scrub-bar::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent-cyan);
+}
+.scrub-bar::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-magenta);
+  box-shadow: var(--glow-magenta);
+  border: none;
+}
+
 input[type='text'],
 .input-retro {
   background: var(--bg-screen);

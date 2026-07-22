@@ -74,6 +74,9 @@ function App() {
               toggleShuffle={player.toggleShuffle}
               repeatMode={player.repeatMode}
               cycleRepeat={player.cycleRepeat}
+              currentTime={player.currentTime}
+              duration={player.duration}
+              seek={player.seek}
             />
           </div>
 
