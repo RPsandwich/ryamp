@@ -10,6 +10,8 @@ export function useAudioPlayer() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const gainRef = useRef<GainNode | null>(null);
+  const bassFilterRef = useRef<BiquadFilterNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const currentBufferRef = useRef<AudioBuffer | null>(null);
   const playbackOffsetRef = useRef(0);
@@ -24,8 +26,10 @@ export function useAudioPlayer() {
   const [currentTrack, setCurrentTrack] = useState<DbTrack | null>(null);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [shuffleOn, setShuffleOn] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [bassBoostOn, setBassBoostOn] = useState(false);
+
+  // Gain (in dB) the low-shelf filter applies when bass boost is on. 0 when off.
+  const BASS_BOOST_GAIN_DB = 9;
 
   // Keep refs in sync so the long-lived `onended` callback (created when a track
   // starts, but firing whenever it finishes) always reads the latest mode rather
@@ -38,37 +42,44 @@ export function useAudioPlayer() {
     shuffleOnRef.current = shuffleOn;
   }, [shuffleOn]);
 
-  // Drives the scrub bar's position. Only runs while actually playing --
-  // when paused, currentTime is set directly (see togglePlay/seek) instead
-  // of via this loop, so it doesn't drift or need its own pause handling.
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    let raf: number;
-    const tick = () => {
-      const ctx = audioContextRef.current;
-      if (ctx) {
-        const elapsed = ctx.currentTime - contextStartTimeRef.current;
-        setCurrentTime(playbackOffsetRef.current + elapsed);
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-
-    return () => cancelAnimationFrame(raf);
-  }, [isPlaying]);
-
   const ensureAudioGraph = () => {
     if (audioContextRef.current) return;
 
     const ctx = new AudioContext({ latencyHint: 'playback' });
+    const bassFilter = ctx.createBiquadFilter();
+    const compressor = ctx.createDynamicsCompressor();
     const analyser = ctx.createAnalyser();
     const gain = ctx.createGain();
 
+    // Low-shelf filter centered around typical "bass boost" territory.
+    // Gain starts at 0 (flat/no effect) and is toggled via setBassBoost
+    // below; kept as its own node rather than baked into anything else so
+    // it's cheap to extend into a full multi-band EQ later if wanted.
+    bassFilter.type = 'lowshelf';
+    bassFilter.frequency.value = 150;
+    bassFilter.gain.value = 0;
+
+    // Gentle "mastering glue" compression rather than a hard limiter -- the
+    // main goal is smoothing out volume differences between tracks ripped/
+    // recorded at very different loudness levels, and taking the edge off
+    // any harsh peaks, without being audibly "squashed."
+    compressor.threshold.value = -18;
+    compressor.knee.value = 20;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.005;
+    compressor.release.value = 0.15;
+
+    // Analyser sits after bass/compression (not directly off the source), so
+    // the visualizer reacts to what's actually audible -- post-EQ, post-
+    // compression -- rather than the raw unprocessed signal.
+    bassFilter.connect(compressor);
+    compressor.connect(analyser);
     analyser.connect(gain);
     gain.connect(ctx.destination);
 
     audioContextRef.current = ctx;
+    bassFilterRef.current = bassFilter;
+    compressorRef.current = compressor;
     analyserRef.current = analyser;
     gainRef.current = gain;
   };
@@ -93,7 +104,7 @@ export function useAudioPlayer() {
     const ctx = audioContextRef.current!;
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.connect(analyserRef.current!);
+    source.connect(bassFilterRef.current!);
 
     // Claim a fresh generation for this specific source. Any earlier source's
     // 'ended' callback — whether it fires promptly, late, or not at all — will
@@ -127,8 +138,6 @@ export function useAudioPlayer() {
     const fileBytes = await readFile(track.filepath);
     const audioBuffer = await audioContextRef.current!.decodeAudioData(fileBytes.buffer.slice(0));
     currentBufferRef.current = audioBuffer;
-    setDuration(audioBuffer.duration);
-    setCurrentTime(0);
 
     if (audioContextRef.current!.state === 'suspended') {
       await audioContextRef.current!.resume();
@@ -211,6 +220,20 @@ export function useAudioPlayer() {
     setRepeatMode((mode) => (mode === 'off' ? 'all' : mode === 'all' ? 'one' : 'off'));
   };
 
+  const toggleBassBoost = () => {
+    setBassBoostOn((prev) => {
+      const next = !prev;
+      const filter = bassFilterRef.current;
+      const ctx = audioContextRef.current;
+      if (filter && ctx) {
+        // setTargetAtTime ramps smoothly rather than jumping instantly, so
+        // toggling mid-playback doesn't produce an audible click/pop.
+        filter.gain.setTargetAtTime(next ? BASS_BOOST_GAIN_DB : 0, ctx.currentTime, 0.05);
+      }
+      return next;
+    });
+  };
+
   const togglePlay = async () => {
     if (!currentTrack || !currentBufferRef.current || !audioContextRef.current) return;
 
@@ -223,27 +246,9 @@ export function useAudioPlayer() {
       playbackOffsetRef.current += elapsed;
       stopCurrentSource();
       setIsPlaying(false);
-      setCurrentTime(playbackOffsetRef.current);
     } else {
       playFromOffset(currentTrack, currentBufferRef.current, playbackOffsetRef.current);
     }
-  };
-
-  // Jumps playback to an absolute position (seconds) for the scrub bar.
-  // If already playing, restarts the source from the new offset so audio
-  // keeps flowing; if paused, just moves the stored offset so the next
-  // togglePlay() resumes from there.
-  const seek = (time: number) => {
-    if (!currentTrack || !currentBufferRef.current) return;
-    const clamped = Math.max(0, Math.min(time, currentBufferRef.current.duration));
-
-    if (isPlaying) {
-      stopCurrentSource();
-      playFromOffset(currentTrack, currentBufferRef.current, clamped);
-    } else {
-      playbackOffsetRef.current = clamped;
-    }
-    setCurrentTime(clamped);
   };
 
   return {
@@ -252,14 +257,13 @@ export function useAudioPlayer() {
     currentTrack,
     repeatMode,
     shuffleOn,
-    duration,
-    currentTime,
+    bassBoostOn,
+    toggleBassBoost,
     selectAndPlay,
     skipNext,
     skipPrevious,
     toggleShuffle,
     cycleRepeat,
     togglePlay,
-    seek,
   };
 }

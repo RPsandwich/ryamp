@@ -1,6 +1,4 @@
-import type { CSSProperties } from 'react';
 import type { DbTrack, RepeatMode } from '../types';
-import { formatDuration } from '../utils';
 import { Marquee } from './Marquee';
 
 interface TransportControlsProps {
@@ -13,9 +11,8 @@ interface TransportControlsProps {
   toggleShuffle: () => void;
   repeatMode: RepeatMode;
   cycleRepeat: () => void;
-  currentTime: number;
-  duration: number;
-  seek: (time: number) => void;
+  bassBoostOn: boolean;
+  toggleBassBoost: () => void;
 }
 
 export function TransportControls({
@@ -28,11 +25,9 @@ export function TransportControls({
   toggleShuffle,
   repeatMode,
   cycleRepeat,
-  currentTime,
-  duration,
-  seek,
+  bassBoostOn,
+  toggleBassBoost,
 }: TransportControlsProps) {
-  const fillPercent = duration > 0 ? (Math.min(currentTime, duration) / duration) * 100 : 0;
   return (
     <>
       <div className="led-screen" style={{ padding: '0.5rem 0.75rem', marginBottom: '1rem' }}>
@@ -40,26 +35,6 @@ export function TransportControls({
           text={currentTrack ? `Now playing: ${currentTrack.title} \u2014 ${currentTrack.artist}` : 'Toriamp \u2014 no track loaded'}
           scroll={isPlaying && !!currentTrack}
         />
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.72rem', color: 'var(--text-dim)', minWidth: '2.6rem', textAlign: 'right' }}>
-          {formatDuration(currentTime)}
-        </span>
-        <input
-          type="range"
-          className="scrub-bar"
-          min={0}
-          max={duration || 0}
-          step={0.01}
-          value={Math.min(currentTime, duration || 0)}
-          onChange={(e) => seek(Number(e.target.value))}
-          disabled={!currentTrack}
-          style={{ '--fill': `${fillPercent}%`, flex: 1 } as CSSProperties}
-        />
-        <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.72rem', color: 'var(--text-dim)', minWidth: '2.6rem' }}>
-          {formatDuration(duration)}
-        </span>
       </div>
 
       <div
@@ -94,6 +69,13 @@ export function TransportControls({
           style={{ flexShrink: 0 }}
         >
           Repeat: {repeatMode === 'off' ? 'Off' : repeatMode === 'all' ? 'All' : 'One'}
+        </button>
+        <button
+          className={bassBoostOn ? 'btn-retro is-active' : 'btn-retro'}
+          onClick={toggleBassBoost}
+          style={{ flexShrink: 0 }}
+        >
+          Bass Boost: {bassBoostOn ? 'On' : 'Off'}
         </button>
       </div>
     </>
